@@ -12,6 +12,7 @@ import type * as clients from "../clients.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as meta from "../meta.js";
+import type * as prospects from "../prospects.js";
 import type * as seed from "../seed.js";
 
 import type {
@@ -25,6 +26,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dashboard: typeof dashboard;
   meta: typeof meta;
+  prospects: typeof prospects;
   seed: typeof seed;
 }>;
 

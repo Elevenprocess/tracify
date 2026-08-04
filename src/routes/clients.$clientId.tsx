@@ -4,9 +4,10 @@ import { api } from '../../convex/_generated/api'
 import KpiCard from '../components/KpiCard'
 import BarChart from '../components/charts/BarChart'
 import SourceSplit from '../components/charts/SourceSplit'
-import { CampaignBadge, ProspectBadge } from '../components/StatusBadge'
+import { CampaignBadge } from '../components/StatusBadge'
 import AppShell from '../components/AppShell'
 import CampaignsPanel from '../components/CampaignsPanel'
+import ProspectsBoard from '../components/ProspectsBoard'
 import {
   ArrowLeftIcon,
   TargetIcon,
@@ -14,20 +15,19 @@ import {
   UsersIcon,
   WalletIcon,
 } from '../components/icons'
-import {
-  formatDay,
-  formatDayRange,
-  formatEuro,
-  formatNumber,
-} from '../lib/format'
+import { formatDayRange, formatEuro, formatNumber } from '../lib/format'
 import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/clients/$clientId')({
-  loader: async ({ params }) => ({
-    initial: await convexHttp.query(api.dashboard.client, {
-      slug: params.clientId,
-    }),
-  }),
+  loader: async ({ params }) => {
+    const [initial, prospectsInitial] = await Promise.all([
+      convexHttp.query(api.dashboard.client, { slug: params.clientId }),
+      convexHttp.query(api.prospects.byClient, {
+        clientSlug: params.clientId,
+      }),
+    ])
+    return { initial, prospectsInitial }
+  },
   component: ClientDetailPage,
 })
 
@@ -41,7 +41,7 @@ function ClientDetailPage() {
 
 function ClientDetail() {
   const { clientId } = Route.useParams()
-  const { initial } = Route.useLoaderData()
+  const { initial, prospectsInitial } = Route.useLoaderData()
   const live = useQuery(api.dashboard.client, { slug: clientId })
   const client = live === undefined ? initial : live
   const removeClient = useMutation(api.clients.remove)
@@ -160,47 +160,7 @@ function ClientDetail() {
         </article>
       </section>
 
-      <section className="mt-6">
-        <h2 className="demo-section-title mb-3">Derniers prospects</h2>
-        <div className="demo-table-shell island-shell rounded-2xl">
-          <table className="demo-table min-w-[640px] text-sm">
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>Téléphone</th>
-                <th>Date</th>
-                <th>Source</th>
-                <th>Support / contenu</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              {client.prospects.map((p) => (
-                <tr key={p.id}>
-                  <td className="font-semibold">{p.name}</td>
-                  <td className="whitespace-nowrap">{p.phone}</td>
-                  <td className="whitespace-nowrap">{formatDay(p.date)}</td>
-                  <td>{p.source}</td>
-                  <td>{p.medium}</td>
-                  <td>
-                    <ProspectBadge status={p.status} />
-                  </td>
-                </tr>
-              ))}
-              {client.prospects.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center text-[var(--sea-ink-soft)]"
-                  >
-                    Aucun prospect sur la période.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <ProspectsBoard clientSlug={client.slug} initial={prospectsInitial} />
     </main>
   )
 }
