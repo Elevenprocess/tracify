@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useMutation, useQuery } from 'convex/react'
+import { useAction, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { BriefcaseIcon, FolderIcon, GridIcon, PlusIcon } from './icons'
 
@@ -103,12 +103,12 @@ function SidebarGroup({
   emptyLabel: string
   addLabel: string
 }) {
-  const createEntry = useMutation(api.clients.create)
+  const createEntry = useAction(api.clients.createChecked)
   const navigate = useNavigate()
 
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
-  const [sector, setSector] = useState('')
+  const [adAccountId, setAdAccountId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -118,17 +118,16 @@ function SidebarGroup({
     setSaving(true)
     setError(null)
     try {
-      const { slug } = await createEntry({
-        name,
-        sector: sector || undefined,
-        kind,
-      })
+      const { slug } = await createEntry({ name, adAccountId, kind })
       setName('')
-      setSector('')
+      setAdAccountId('')
       setShowForm(false)
       navigate({ to: '/clients/$clientId', params: { clientId: slug } })
     } catch (err) {
-      setError(String(err).replace(/^.*Error: /, ''))
+      const raw = String(err)
+      const cleaned =
+        raw.split('Uncaught Error: ').pop()?.split(' at handler')[0] ?? raw
+      setError(cleaned.trim())
     } finally {
       setSaving(false)
     }
@@ -172,14 +171,18 @@ function SidebarGroup({
             />
           </label>
           <label className="text-xs font-semibold text-[var(--sea-ink-soft)]">
-            Secteur (optionnel)
+            ID du compte publicitaire
             <input
-              value={sector}
-              onChange={(e) => setSector(e.target.value)}
-              placeholder="Ex. Photovoltaïque"
+              value={adAccountId}
+              onChange={(e) => setAdAccountId(e.target.value)}
+              required
+              placeholder="Ex. 928367685155102"
               className="mt-1 w-full rounded-lg border border-[var(--line)] bg-transparent px-2.5 py-1.5 text-sm text-[var(--sea-ink)] outline-none focus:border-[var(--lagoon)]"
             />
           </label>
+          <p className="m-0 text-[11px] leading-snug text-[var(--sea-ink-soft)]">
+            Les campagnes actives du compte seront rattachées automatiquement.
+          </p>
           {error && (
             <p className="m-0 text-xs text-[var(--status-warn)]">{error}</p>
           )}

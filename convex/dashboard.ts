@@ -74,7 +74,7 @@ export const overview = query({
           return {
             slug: c.slug,
             name: c.name,
-            sector: c.sector,
+            sector: c.sector ?? null,
             status: c.status,
             activeCampaigns:
               activeByClient.get(c.slug) ?? c.activeCampaigns ?? 0,
@@ -151,7 +151,8 @@ export const client = query({
     return {
       slug: client.slug,
       name: client.name,
-      sector: client.sector,
+      sector: client.sector ?? null,
+      adAccountId: client.adAccountId ?? null,
       status: client.status,
       activeCampaigns:
         campaigns.filter((c) => !c.status || c.status === 'ACTIVE').length ||

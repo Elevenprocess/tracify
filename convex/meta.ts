@@ -363,10 +363,100 @@ export const syncCampaign = internalAction({
   },
 })
 
-// Cron : resync de toutes les campagnes.
+// Vérifie qu'un compte publicitaire est accessible avec le token.
+export const assertAdAccount = internalAction({
+  args: { account: v.string() },
+  handler: async (_ctx, { account }) => {
+    const params = new URLSearchParams({
+      fields: 'name,account_id',
+      access_token: metaAccessToken(),
+    })
+    const res = await fetch(`${GRAPH_BASE}/${account}?${params}`)
+    if (!res.ok) {
+      throw new Error(
+        "Meta ne reconnaît pas ce compte publicitaire, ou le token d'Erwan n'y a pas accès. Vérifie l'ID du compte dans le Gestionnaire de publicités (Paramètres du compte).",
+      )
+    }
+    const json = (await res.json()) as { name?: string }
+    return { name: json.name ?? account }
+  },
+})
+
+export const listClientsWithAccounts = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const clients = await ctx.db.query('clients').collect()
+    return clients
+      .filter((c) => c.adAccountId)
+      .map((c) => ({ clientSlug: c.slug, account: c.adAccountId! }))
+  },
+})
+
+// Détecte les campagnes ACTIVES d'un compte publicitaire et rattache
+// automatiquement celles qui ne le sont pas encore (sync incluse).
+export const discoverCampaigns = internalAction({
+  args: { clientSlug: v.string(), account: v.string() },
+  handler: async (ctx, { clientSlug, account }) => {
+    const params = new URLSearchParams({
+      fields: 'name,effective_status',
+      limit: '200',
+      access_token: metaAccessToken(),
+    })
+    const found: Array<{
+      id: string
+      name?: string
+      effective_status?: string
+    }> = []
+    let url: string | undefined = `${GRAPH_BASE}/${account}/campaigns?${params}`
+    while (url) {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text()}`)
+      const json = (await res.json()) as {
+        data?: Array<{ id: string; name?: string; effective_status?: string }>
+        paging?: { next?: string }
+      }
+      found.push(...(json.data ?? []))
+      url = json.paging?.next
+    }
+
+    let added = 0
+    for (const c of found) {
+      if (c.effective_status !== 'ACTIVE') continue
+      const exists = await ctx.runQuery(internal.meta.campaignExists, {
+        metaId: c.id,
+      })
+      if (exists) continue
+      await ctx.runMutation(internal.meta.insertCampaign, {
+        clientSlug,
+        metaId: c.id,
+        name: c.name,
+        status: c.effective_status,
+      })
+      added++
+    }
+    console.log(
+      `Découverte ${account} (${clientSlug}) : ${found.length} campagnes, ${added} rattachées`,
+    )
+    return { total: found.length, added }
+  },
+})
+
+// Cron : resync de toutes les campagnes + détection des nouvelles campagnes
+// actives sur les comptes publicitaires rattachés.
 export const syncAll = internalAction({
   args: {},
   handler: async (ctx) => {
+    const withAccounts = await ctx.runQuery(
+      internal.meta.listClientsWithAccounts,
+      {},
+    )
+    for (const c of withAccounts) {
+      try {
+        await ctx.runAction(internal.meta.discoverCampaigns, c)
+      } catch (e) {
+        console.error(`Découverte ${c.account} en échec :`, e)
+      }
+    }
     const campaigns = await ctx.runMutation(internal.meta.listAllCampaigns, {})
     for (const c of campaigns) {
       await ctx.runAction(internal.meta.syncCampaign, c)

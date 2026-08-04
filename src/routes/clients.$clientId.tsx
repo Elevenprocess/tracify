@@ -77,14 +77,18 @@ function ClientDetail() {
           <CampaignBadge status={client.status} />
         </div>
         <p className="m-0 mt-1 text-sm text-[var(--sea-ink-soft)]">
-          {client.sector} · {formatNumber(client.activeCampaigns)} campagne
+          {client.sector ?? client.adAccountId ?? 'Compte non connecté'} ·{' '}
+          {formatNumber(client.activeCampaigns)} campagne
           {client.activeCampaigns > 1 ? 's' : ''} active
           {client.activeCampaigns > 1 ? 's' : ''} · 30 derniers jours
         </p>
       </header>
 
       <section className="mb-6">
-        <CampaignsPanel clientSlug={client.slug} />
+        <CampaignsPanel
+          clientSlug={client.slug}
+          adAccountId={client.adAccountId}
+        />
       </section>
 
       <section
