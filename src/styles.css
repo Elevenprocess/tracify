@@ -52,6 +52,10 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Footer collant : le contenu pousse, le footer reste en bas de l'écran */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 @layer base {
