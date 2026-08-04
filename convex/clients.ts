@@ -162,6 +162,58 @@ export const create = mutation({
   },
 })
 
+// Suppression complète d'un client/projet : campagnes, stats quotidiennes,
+// créatives et prospects associés.
+export const remove = mutation({
+  args: { slug: v.string() },
+  handler: async (ctx, { slug }) => {
+    const client = await ctx.db
+      .query('clients')
+      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .unique()
+    if (!client) throw new Error('Introuvable')
+
+    const campaigns = await ctx.db
+      .query('campaigns')
+      .withIndex('by_client', (q) => q.eq('clientSlug', slug))
+      .collect()
+
+    for (const campaign of campaigns) {
+      const [ads, adDaily] = await Promise.all([
+        ctx.db
+          .query('ads')
+          .withIndex('by_campaign', (q) => q.eq('campaignId', campaign.metaId))
+          .collect(),
+        ctx.db
+          .query('adDaily')
+          .withIndex('by_campaign', (q) => q.eq('campaignId', campaign.metaId))
+          .collect(),
+      ])
+      await Promise.all([...ads, ...adDaily].map((r) => ctx.db.delete(r._id)))
+      await ctx.db.delete(campaign._id)
+    }
+
+    const [daily, sources, prospects] = await Promise.all([
+      ctx.db
+        .query('dailyStats')
+        .withIndex('by_client_date', (q) => q.eq('clientSlug', slug))
+        .collect(),
+      ctx.db
+        .query('sourceStats')
+        .withIndex('by_client', (q) => q.eq('clientSlug', slug))
+        .collect(),
+      ctx.db
+        .query('prospects')
+        .withIndex('by_client', (q) => q.eq('clientSlug', slug))
+        .collect(),
+    ])
+    await Promise.all(
+      [...daily, ...sources, ...prospects].map((r) => ctx.db.delete(r._id)),
+    )
+    await ctx.db.delete(client._id)
+  },
+})
+
 // Basculer un enregistrement entre projet et client
 export const setKind = mutation({
   args: {

@@ -1,5 +1,5 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import KpiCard from '../components/KpiCard'
 import BarChart from '../components/charts/BarChart'
@@ -10,6 +10,7 @@ import CampaignsPanel from '../components/CampaignsPanel'
 import {
   ArrowLeftIcon,
   TargetIcon,
+  TrashIcon,
   UsersIcon,
   WalletIcon,
 } from '../components/icons'
@@ -35,6 +36,8 @@ function ClientDetailPage() {
 function ClientDetail() {
   const { clientId } = Route.useParams()
   const client = useQuery(api.dashboard.client, { slug: clientId })
+  const removeClient = useMutation(api.clients.remove)
+  const navigate = useNavigate()
 
   if (client === undefined) {
     return <p className="demo-muted m-0 text-sm">Chargement des données…</p>
@@ -75,6 +78,24 @@ function ClientDetail() {
             {client.name}
           </h1>
           <CampaignBadge status={client.status} />
+          <button
+            type="button"
+            aria-label={`Supprimer ${client.name}`}
+            onClick={async () => {
+              if (
+                window.confirm(
+                  `Supprimer « ${client.name} » ? Ses campagnes, statistiques et créatives seront effacées de Tracify (rien n'est touché côté Meta).`,
+                )
+              ) {
+                await removeClient({ slug: client.slug })
+                navigate({ to: '/dashboard' })
+              }
+            }}
+            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--line)] bg-transparent px-3 py-1.5 text-sm font-semibold text-[var(--sea-ink-soft)] transition-colors hover:border-[var(--status-warn)] hover:text-[var(--status-warn)]"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+            Supprimer
+          </button>
         </div>
         <p className="m-0 mt-1 text-sm text-[var(--sea-ink-soft)]">
           {client.sector ?? client.adAccountId ?? 'Compte non connecté'} ·{' '}
