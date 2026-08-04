@@ -6,6 +6,12 @@ import BarChart from '../components/charts/BarChart'
 import SourceSplit from '../components/charts/SourceSplit'
 import { CampaignBadge, ProspectBadge } from '../components/StatusBadge'
 import {
+  ArrowLeftIcon,
+  TargetIcon,
+  UsersIcon,
+  WalletIcon,
+} from '../components/icons'
+import {
   formatDay,
   formatDayRange,
   formatEuro,
@@ -52,9 +58,10 @@ function ClientDetail() {
         <nav aria-label="Fil d'Ariane" className="mb-2 text-sm">
           <Link
             to="/dashboard"
-            className="no-underline text-[var(--sea-ink-soft)] hover:text-[var(--sea-ink)]"
+            className="inline-flex items-center gap-1.5 no-underline text-[var(--sea-ink-soft)] hover:text-[var(--sea-ink)]"
           >
-            ← Tableau de bord
+            <ArrowLeftIcon className="h-3.5 w-3.5" />
+            Tableau de bord
           </Link>
         </nav>
         <div className="flex flex-wrap items-center gap-3">
@@ -77,11 +84,17 @@ function ClientDetail() {
         <KpiCard
           label="Dépense publicitaire"
           value={formatEuro(client.spend30d)}
+          icon={<WalletIcon />}
         />
-        <KpiCard label="Prospects" value={formatNumber(client.leads30d)} />
+        <KpiCard
+          label="Prospects"
+          value={formatNumber(client.leads30d)}
+          icon={<UsersIcon />}
+        />
         <KpiCard
           label="Coût par prospect"
           value={client.cpl !== null ? formatEuro(client.cpl) : '—'}
+          icon={<TargetIcon />}
         />
       </section>
 

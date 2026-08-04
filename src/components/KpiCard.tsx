@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react'
+
 interface KpiCardProps {
   label: string
   value: string
+  icon?: ReactNode
   delta?: number
   deltaLabel?: string
   deltaGoodWhenDown?: boolean
@@ -9,6 +12,7 @@ interface KpiCardProps {
 export default function KpiCard({
   label,
   value,
+  icon,
   delta,
   deltaLabel,
   deltaGoodWhenDown = false,
@@ -18,7 +22,10 @@ export default function KpiCard({
 
   return (
     <article className="island-shell rounded-2xl p-5">
-      <p className="island-kicker m-0 mb-2">{label}</p>
+      <p className="island-kicker m-0 mb-3 flex items-center gap-2">
+        {icon}
+        {label}
+      </p>
       <p className="m-0 text-3xl font-bold tracking-tight text-[var(--sea-ink)]">
         {value}
       </p>

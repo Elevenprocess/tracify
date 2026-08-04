@@ -120,8 +120,7 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
           let uAmp = mountainUniforms.uAmp.value
           let distortion = new THREE.Vector3(
             Math.cos(progress * Math.PI * uFreq.x + time) * uAmp.x -
-              Math.cos(movementProgressFix * Math.PI * uFreq.x + time) *
-                uAmp.x,
+              Math.cos(movementProgressFix * Math.PI * uFreq.x + time) * uAmp.x,
             nsin(progress * Math.PI * uFreq.y + time) * uAmp.y -
               nsin(movementProgressFix * Math.PI * uFreq.y + time) * uAmp.y,
             nsin(progress * Math.PI * uFreq.z + time) * uAmp.z -
@@ -153,8 +152,7 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
           let uAmp = xyUniforms.uAmp.value
           let distortion = new THREE.Vector3(
             Math.cos(progress * Math.PI * uFreq.x + time) * uAmp.x -
-              Math.cos(movementProgressFix * Math.PI * uFreq.x + time) *
-                uAmp.x,
+              Math.cos(movementProgressFix * Math.PI * uFreq.x + time) * uAmp.x,
             Math.sin(progress * Math.PI * uFreq.y + time + Math.PI / 2) *
               uAmp.y -
               Math.sin(
@@ -242,7 +240,10 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
 
           const getY = (p) =>
             -nsin(Math.PI * p * uFreq.z + time) * uAmp.z -
-            Math.pow(nsin(Math.PI * p * uFreq.w + time / (uFreq.z / uFreq.w)), 5) *
+            Math.pow(
+              nsin(Math.PI * p * uFreq.w + time / (uFreq.z / uFreq.w)),
+              5,
+            ) *
               uAmp.w
 
           let distortion = new THREE.Vector3(
@@ -657,10 +658,7 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
         if (this.renderer) {
           this.renderer.dispose()
           this.renderer.forceContextLoss()
-          if (
-            this.renderer.domElement &&
-            this.renderer.domElement.parentNode
-          ) {
+          if (this.renderer.domElement && this.renderer.domElement.parentNode) {
             this.renderer.domElement.parentNode.removeChild(
               this.renderer.domElement,
             )
@@ -851,7 +849,11 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
 
         instanced.setAttribute(
           'aOffset',
-          new THREE.InstancedBufferAttribute(new Float32Array(aOffset), 3, false),
+          new THREE.InstancedBufferAttribute(
+            new Float32Array(aOffset),
+            3,
+            false,
+          ),
         )
         instanced.setAttribute(
           'aMetrics',
@@ -863,7 +865,11 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
         )
         instanced.setAttribute(
           'aColor',
-          new THREE.InstancedBufferAttribute(new Float32Array(aColor), 3, false),
+          new THREE.InstancedBufferAttribute(
+            new Float32Array(aColor),
+            3,
+            false,
+          ),
         )
 
         let material = new THREE.ShaderMaterial({
@@ -989,11 +995,19 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
 
         instanced.setAttribute(
           'aOffset',
-          new THREE.InstancedBufferAttribute(new Float32Array(aOffset), 1, false),
+          new THREE.InstancedBufferAttribute(
+            new Float32Array(aOffset),
+            1,
+            false,
+          ),
         )
         instanced.setAttribute(
           'aColor',
-          new THREE.InstancedBufferAttribute(new Float32Array(aColor), 3, false),
+          new THREE.InstancedBufferAttribute(
+            new Float32Array(aColor),
+            3,
+            false,
+          ),
         )
         instanced.setAttribute(
           'aMetrics',

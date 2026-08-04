@@ -4,6 +4,7 @@ import { api } from '../../convex/_generated/api'
 import KpiCard from '../components/KpiCard'
 import LineChart from '../components/charts/LineChart'
 import { CampaignBadge } from '../components/StatusBadge'
+import { TargetIcon, UsersIcon, WalletIcon } from '../components/icons'
 import { formatDay, formatEuro, formatNumber } from '../lib/format'
 
 export const Route = createFileRoute('/dashboard')({ component: Dashboard })
@@ -50,18 +51,21 @@ function Dashboard() {
         <KpiCard
           label="Dépense publicitaire"
           value={formatEuro(totalSpend)}
+          icon={<WalletIcon />}
           delta={6.4}
           deltaLabel="vs 30 j précédents"
         />
         <KpiCard
           label="Prospects"
           value={formatNumber(totalLeads)}
+          icon={<UsersIcon />}
           delta={11.2}
           deltaLabel="vs 30 j précédents"
         />
         <KpiCard
           label="Coût par prospect"
           value={formatEuro(avgCpl)}
+          icon={<TargetIcon />}
           delta={-4.3}
           deltaLabel="vs 30 j précédents"
           deltaGoodWhenDown

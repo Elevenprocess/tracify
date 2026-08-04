@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 
 interface LineChartProps {
   data: Array<{ label: string; value: number }>
@@ -16,7 +16,6 @@ export default function LineChart({
   formatValue,
   height = 220,
 }: LineChartProps) {
-  const gradientId = useId()
   const svgRef = useRef<SVGSVGElement>(null)
   const [hover, setHover] = useState<number | null>(null)
 
@@ -63,13 +62,6 @@ export default function LineChart({
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
       >
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
         {ticks.map((t) => (
           <g key={t}>
             <line
@@ -107,7 +99,7 @@ export default function LineChart({
           </text>
         ))}
 
-        <path d={area} fill={`url(#${gradientId})`} />
+        <path d={area} fill={color} fillOpacity="0.07" />
         <path
           d={path}
           fill="none"
@@ -133,7 +125,7 @@ export default function LineChart({
               cy={y(data[hover].value)}
               r="4.5"
               fill={color}
-              stroke="var(--surface-strong)"
+              stroke="var(--surface-solid)"
               strokeWidth="2"
             />
           </g>
@@ -142,7 +134,7 @@ export default function LineChart({
 
       {hover !== null && (
         <div
-          className="pointer-events-none absolute top-1 z-10 rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-1.5 text-xs shadow-lg"
+          className="pointer-events-none absolute top-1 z-10 rounded-lg border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-1.5 text-xs"
           style={{
             left: `${(x(hover) / W) * 100}%`,
             transform: `translateX(${hover > data.length / 2 ? 'calc(-100% - 10px)' : '10px'})`,
