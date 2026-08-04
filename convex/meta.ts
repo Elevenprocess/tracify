@@ -368,13 +368,20 @@ export const syncCampaign = internalAction({
 export const keepWarm = internalAction({
   args: {},
   handler: async () => {
-    try {
-      await fetch('https://tracify-eta.vercel.app/keep-warm', {
-        headers: { 'user-agent': 'tracify-keepwarm' },
-      })
-    } catch (e) {
-      console.warn('keepWarm :', e)
-    }
+    // Une URL par fonction ISR (chaque section a la sienne) + le fallback.
+    const urls = [
+      'https://tracify-eta.vercel.app/keep-warm',
+      'https://tracify-eta.vercel.app/dashboard',
+      'https://tracify-eta.vercel.app/clients/keep-warm',
+      'https://tracify-eta.vercel.app/campagnes/keep-warm',
+    ]
+    await Promise.all(
+      urls.map((u) =>
+        fetch(u, { headers: { 'user-agent': 'tracify-keepwarm' } }).catch((e) =>
+          console.warn('keepWarm', u, ':', e),
+        ),
+      ),
+    )
   },
 })
 
