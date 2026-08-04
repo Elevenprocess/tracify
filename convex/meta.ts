@@ -5,8 +5,10 @@
  * référence simplement des IDs de campagnes Meta.
  */
 import {
+  action,
   internalAction,
   internalMutation,
+  internalQuery,
   mutation,
   query,
 } from './_generated/server'
@@ -347,10 +349,14 @@ export const syncCampaign = internalAction({
       })
       console.log(`Sync ${metaId} (${clientSlug}) : ${rows.length} jours`)
     } catch (e) {
+      const raw = String(e)
+      const friendly = /does not exist|missing permissions/i.test(raw)
+        ? "Campagne introuvable ou inaccessible avec le token Meta — vérifie l'ID dans le Gestionnaire de publicités."
+        : raw.slice(0, 300)
       await ctx.runMutation(internal.meta.patchCampaign, {
         id,
         lastSyncedAt: now.toISOString(),
-        syncError: String(e).slice(0, 300),
+        syncError: friendly,
       })
       console.error(`Sync ${metaId} en échec :`, e)
     }
@@ -387,6 +393,91 @@ export const campaignsByClient = query({
         syncError: c.syncError ?? null,
       }))
       .sort((a, b) => (a.name ?? a.metaId).localeCompare(b.name ?? b.metaId))
+  },
+})
+
+export const campaignExists = internalQuery({
+  args: { metaId: v.string() },
+  handler: async (ctx, { metaId }) => {
+    const dup = await ctx.db
+      .query('campaigns')
+      .withIndex('by_meta', (q) => q.eq('metaId', metaId))
+      .unique()
+    return dup !== null
+  },
+})
+
+export const insertCampaign = internalMutation({
+  args: {
+    clientSlug: v.string(),
+    metaId: v.string(),
+    name: v.optional(v.string()),
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, { clientSlug, metaId, name, status }) => {
+    const id = await ctx.db.insert('campaigns', {
+      clientSlug,
+      metaId,
+      name,
+      status,
+      createdAt: new Date().toISOString(),
+    })
+    await ctx.scheduler.runAfter(0, internal.meta.syncCampaign, {
+      id,
+      clientSlug,
+      metaId,
+    })
+    return id
+  },
+})
+
+// Ajout avec validation immédiate : on interroge Meta AVANT d'enregistrer,
+// pour refuser tout de suite un ID inconnu / inaccessible / qui n'est pas
+// une campagne, avec un message clair.
+export const addCampaignChecked = action({
+  args: { clientSlug: v.string(), metaId: v.string() },
+  handler: async (ctx, { clientSlug, metaId }) => {
+    const cleaned = metaId.trim().replace(/\s/g, '')
+    if (!/^\d{5,25}$/.test(cleaned))
+      throw new Error(
+        "ID invalide : colle uniquement les chiffres de l'« Identifiant de la campagne ».",
+      )
+
+    const dup = await ctx.runQuery(internal.meta.campaignExists, {
+      metaId: cleaned,
+    })
+    if (dup) throw new Error('Cette campagne est déjà rattachée.')
+
+    const params = new URLSearchParams({
+      fields: 'name,effective_status',
+      metadata: '1',
+      access_token: metaAccessToken(),
+    })
+    const res = await fetch(`${GRAPH_BASE}/${cleaned}?${params}`)
+    if (!res.ok) {
+      throw new Error(
+        'Meta ne reconnaît pas cet ID : campagne introuvable ou hors des comptes accessibles avec le token. Dans le Gestionnaire de publicités, copie la colonne « Identifiant de la campagne » (18 chiffres, commence souvent par 120…).',
+      )
+    }
+    const json = (await res.json()) as {
+      name?: string
+      effective_status?: string
+      metadata?: { type?: string }
+    }
+    const type = json.metadata?.type
+    if (type && type.toLowerCase() !== 'campaign') {
+      throw new Error(
+        `Cet ID correspond à un objet « ${type} », pas à une campagne. Copie l'« Identifiant de la campagne » dans le Gestionnaire de publicités.`,
+      )
+    }
+
+    await ctx.runMutation(internal.meta.insertCampaign, {
+      clientSlug,
+      metaId: cleaned,
+      name: json.name,
+      status: json.effective_status,
+    })
+    return { metaId: cleaned, name: json.name ?? null }
   },
 })
 

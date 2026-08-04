@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useMutation, useQuery } from 'convex/react'
+import { useAction, useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { MegaphoneIcon, PlusIcon, TrashIcon } from './icons'
 
@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 export default function CampaignsPanel({ clientSlug }: { clientSlug: string }) {
   const campaigns = useQuery(api.meta.campaignsByClient, { clientSlug })
-  const addCampaign = useMutation(api.meta.addCampaign)
+  const addCampaign = useAction(api.meta.addCampaignChecked)
   const removeCampaign = useMutation(api.meta.removeCampaign)
 
   const [metaId, setMetaId] = useState('')
@@ -28,7 +28,10 @@ export default function CampaignsPanel({ clientSlug }: { clientSlug: string }) {
       await addCampaign({ clientSlug, metaId })
       setMetaId('')
     } catch (err) {
-      setError(String(err).replace(/^.*Error: /, ''))
+      const raw = String(err)
+      const cleaned =
+        raw.split('Uncaught Error: ').pop()?.split(' at handler')[0] ?? raw
+      setError(cleaned.trim())
     } finally {
       setSaving(false)
     }
