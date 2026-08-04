@@ -7,8 +7,16 @@ import { CampaignBadge } from '../components/StatusBadge'
 import AppShell from '../components/AppShell'
 import { TargetIcon, UsersIcon, WalletIcon } from '../components/icons'
 import { formatDay, formatEuro, formatNumber } from '../lib/format'
+import { convexHttp } from '../lib/convexServer'
 
-export const Route = createFileRoute('/dashboard')({ component: DashboardPage })
+export const Route = createFileRoute('/dashboard')({
+  // Les données arrivent avec la page (SSR + préchargement au survol) ;
+  // le websocket Convex prend ensuite le relais pour le temps réel.
+  loader: async () => ({
+    initial: await convexHttp.query(api.dashboard.overview, {}),
+  }),
+  component: DashboardPage,
+})
 
 function DashboardPage() {
   return (
@@ -19,7 +27,9 @@ function DashboardPage() {
 }
 
 function Dashboard() {
-  const data = useQuery(api.dashboard.overview)
+  const { initial } = Route.useLoaderData()
+  const live = useQuery(api.dashboard.overview)
+  const data = live ?? initial
 
   if (!data) {
     return <p className="demo-muted m-0 text-sm">Chargement des données…</p>

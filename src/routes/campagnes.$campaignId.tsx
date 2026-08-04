@@ -18,8 +18,14 @@ import {
   formatNumber,
   formatPercent,
 } from '../lib/format'
+import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/campagnes/$campaignId')({
+  loader: async ({ params }) => ({
+    initial: await convexHttp.query(api.meta.campaignDetail, {
+      metaId: params.campaignId,
+    }),
+  }),
   component: CampaignPage,
 })
 
@@ -38,7 +44,9 @@ function CampaignPage() {
 
 function CampaignDetail() {
   const { campaignId } = Route.useParams()
-  const data = useQuery(api.meta.campaignDetail, { metaId: campaignId })
+  const { initial } = Route.useLoaderData()
+  const live = useQuery(api.meta.campaignDetail, { metaId: campaignId })
+  const data = live === undefined ? initial : live
 
   if (data === undefined) {
     return <p className="demo-muted m-0 text-sm">Chargement des données…</p>

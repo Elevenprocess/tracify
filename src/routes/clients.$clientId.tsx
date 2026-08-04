@@ -20,8 +20,14 @@ import {
   formatEuro,
   formatNumber,
 } from '../lib/format'
+import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/clients/$clientId')({
+  loader: async ({ params }) => ({
+    initial: await convexHttp.query(api.dashboard.client, {
+      slug: params.clientId,
+    }),
+  }),
   component: ClientDetailPage,
 })
 
@@ -35,7 +41,9 @@ function ClientDetailPage() {
 
 function ClientDetail() {
   const { clientId } = Route.useParams()
-  const client = useQuery(api.dashboard.client, { slug: clientId })
+  const { initial } = Route.useLoaderData()
+  const live = useQuery(api.dashboard.client, { slug: clientId })
+  const client = live === undefined ? initial : live
   const removeClient = useMutation(api.clients.remove)
   const navigate = useNavigate()
 
