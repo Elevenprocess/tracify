@@ -155,6 +155,7 @@ code {
   font-size: 0.8rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .demo-table tr:hover td {

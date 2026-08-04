@@ -18,3 +18,6 @@ export const formatDay = (iso: string) =>
 
 export const formatDayRange = (startIso: string, endIso: string) =>
   `${formatDay(startIso)}–${formatDay(endIso)}`
+
+export const formatPercent = (n: number) =>
+  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n)} %`

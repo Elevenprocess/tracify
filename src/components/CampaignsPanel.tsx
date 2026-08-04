@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { MegaphoneIcon, PlusIcon, TrashIcon } from './icons'
@@ -71,9 +72,13 @@ export default function CampaignsPanel({ clientSlug }: { clientSlug: string }) {
           return (
             <li
               key={c.id}
-              className="flex items-center gap-3 rounded-xl border border-[var(--line)] px-3.5 py-2.5"
+              className="flex items-center gap-3 rounded-xl border border-[var(--line)] px-3.5 py-2.5 transition-colors hover:border-[var(--lagoon)]"
             >
-              <div className="min-w-0 flex-1">
+              <Link
+                to="/campagnes/$campaignId"
+                params={{ campaignId: c.metaId }}
+                className="min-w-0 flex-1 no-underline"
+              >
                 <p className="m-0 truncate text-sm font-semibold text-[var(--sea-ink)]">
                   {c.name ?? `Campagne ${c.metaId}`}
                 </p>
@@ -82,13 +87,14 @@ export default function CampaignsPanel({ clientSlug }: { clientSlug: string }) {
                   {c.lastSyncedAt
                     ? ` · synchronisée ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(c.lastSyncedAt))}`
                     : ' · synchronisation en cours…'}
+                  {' · voir les créatives →'}
                 </p>
                 {c.syncError && (
                   <p className="m-0 mt-1 text-xs text-[var(--status-warn)]">
                     Erreur de sync : {c.syncError}
                   </p>
                 )}
-              </div>
+              </Link>
               <span
                 className="demo-pill whitespace-nowrap"
                 style={status ? undefined : { color: 'var(--sea-ink-soft)' }}

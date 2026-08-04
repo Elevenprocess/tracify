@@ -34,7 +34,11 @@ const LEAD_ACTION_TYPES = [
 
 interface GraphInsightRow {
   date_start?: string
+  ad_id?: string
+  ad_name?: string
   spend?: string
+  impressions?: string
+  clicks?: string
   actions?: Array<{ action_type?: string; value?: string }>
 }
 
@@ -87,6 +91,78 @@ async function fetchCampaignDaily(metaId: string, from: string, to: string) {
   return rows
 }
 
+// Lignes quotidiennes par créative (level=ad).
+async function fetchCampaignAdsDaily(metaId: string, from: string, to: string) {
+  const params = new URLSearchParams({
+    level: 'ad',
+    fields: 'ad_id,ad_name,spend,impressions,clicks,actions',
+    time_range: JSON.stringify({ since: from, until: to }),
+    time_increment: '1',
+    limit: '500',
+    access_token: metaAccessToken(),
+  })
+  const rows: Array<{
+    adId: string
+    adName: string
+    date: string
+    spend: number
+    impressions: number
+    clicks: number
+    leads: number
+  }> = []
+  let url: string | undefined = `${GRAPH_BASE}/${metaId}/insights?${params}`
+  while (url) {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text()}`)
+    const json = (await res.json()) as {
+      data?: Array<GraphInsightRow>
+      paging?: { next?: string }
+    }
+    for (const r of json.data ?? []) {
+      if (!r.date_start || !r.ad_id) continue
+      rows.push({
+        adId: r.ad_id,
+        adName: r.ad_name ?? r.ad_id,
+        date: r.date_start,
+        spend: Number(r.spend ?? 0) || 0,
+        impressions: Number(r.impressions ?? 0) || 0,
+        clicks: Number(r.clicks ?? 0) || 0,
+        leads: leadsFromActions(r.actions),
+      })
+    }
+    url = json.paging?.next
+  }
+  return rows
+}
+
+// Détails (statut + miniature) de créatives par lots de 40 via ?ids=…
+async function fetchAdDetails(adIds: Array<string>) {
+  const out = new Map<string, { status?: string; thumbnailUrl?: string }>()
+  for (let i = 0; i < adIds.length; i += 40) {
+    const batch = adIds.slice(i, i + 40)
+    const params = new URLSearchParams({
+      ids: batch.join(','),
+      fields: 'effective_status,creative{thumbnail_url}',
+      access_token: metaAccessToken(),
+    })
+    const res = await fetch(`${GRAPH_BASE}/?${params}`)
+    if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text()}`)
+    const json = (await res.json()) as Record<
+      string,
+      { effective_status?: string; creative?: { thumbnail_url?: string } }
+    >
+    for (const id of batch) {
+      const d = json[id]
+      if (d)
+        out.set(id, {
+          status: d.effective_status,
+          thumbnailUrl: d.creative?.thumbnail_url,
+        })
+    }
+  }
+  return out
+}
+
 // Upsert idempotent des lignes quotidiennes d'une campagne.
 export const saveDaily = internalMutation({
   args: {
@@ -117,6 +193,72 @@ export const saveDaily = internalMutation({
           spend: row.spend,
           leads: row.leads,
         })
+      }
+    }
+  },
+})
+
+// Upsert des lignes quotidiennes par créative.
+export const saveAdDaily = internalMutation({
+  args: {
+    campaignId: v.string(),
+    rows: v.array(
+      v.object({
+        adId: v.string(),
+        date: v.string(),
+        spend: v.number(),
+        impressions: v.number(),
+        clicks: v.number(),
+        leads: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, { campaignId, rows }) => {
+    for (const row of rows) {
+      const existing = await ctx.db
+        .query('adDaily')
+        .withIndex('by_ad_date', (q) =>
+          q.eq('adId', row.adId).eq('date', row.date),
+        )
+        .unique()
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          spend: row.spend,
+          impressions: row.impressions,
+          clicks: row.clicks,
+          leads: row.leads,
+        })
+      } else {
+        await ctx.db.insert('adDaily', { campaignId, ...row })
+      }
+    }
+  },
+})
+
+// Upsert des fiches créatives (nom, statut, miniature).
+export const upsertAds = internalMutation({
+  args: {
+    campaignId: v.string(),
+    ads: v.array(
+      v.object({
+        adId: v.string(),
+        name: v.optional(v.string()),
+        status: v.optional(v.string()),
+        thumbnailUrl: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, { campaignId, ads }) => {
+    const now = new Date().toISOString()
+    for (const ad of ads) {
+      const existing = await ctx.db
+        .query('ads')
+        .withIndex('by_ad', (q) => q.eq('adId', ad.adId))
+        .unique()
+      if (existing) {
+        await ctx.db.patch(existing._id, { ...ad, campaignId, updatedAt: now })
+      } else {
+        await ctx.db.insert('ads', { ...ad, campaignId, updatedAt: now })
       }
     }
   },
@@ -173,6 +315,29 @@ export const syncCampaign = internalAction({
           rows: rows.slice(i, i + 100),
         })
       }
+
+      // Niveau créative : lignes quotidiennes + fiches (statut, miniature)
+      const adRows = await fetchCampaignAdsDaily(metaId, from, to)
+      for (let i = 0; i < adRows.length; i += 100) {
+        await ctx.runMutation(internal.meta.saveAdDaily, {
+          campaignId: metaId,
+          rows: adRows.slice(i, i + 100).map(({ adName: _adName, ...r }) => r),
+        })
+      }
+      const namesById = new Map<string, string>()
+      for (const r of adRows) namesById.set(r.adId, r.adName)
+      const adIds = [...namesById.keys()]
+      const details = await fetchAdDetails(adIds)
+      await ctx.runMutation(internal.meta.upsertAds, {
+        campaignId: metaId,
+        ads: adIds.map((adId) => ({
+          adId,
+          name: namesById.get(adId),
+          status: details.get(adId)?.status,
+          thumbnailUrl: details.get(adId)?.thumbnailUrl,
+        })),
+      })
+
       await ctx.runMutation(internal.meta.patchCampaign, {
         id,
         name: meta.name,
@@ -258,11 +423,136 @@ export const removeCampaign = mutation({
   handler: async (ctx, { id }) => {
     const campaign = await ctx.db.get(id)
     if (!campaign) return
-    const stats = await ctx.db
-      .query('dailyStats')
-      .withIndex('by_campaign_date', (q) => q.eq('campaignId', campaign.metaId))
-      .collect()
-    await Promise.all(stats.map((s) => ctx.db.delete(s._id)))
+    const [stats, ads, adDaily] = await Promise.all([
+      ctx.db
+        .query('dailyStats')
+        .withIndex('by_campaign_date', (q) =>
+          q.eq('campaignId', campaign.metaId),
+        )
+        .collect(),
+      ctx.db
+        .query('ads')
+        .withIndex('by_campaign', (q) => q.eq('campaignId', campaign.metaId))
+        .collect(),
+      ctx.db
+        .query('adDaily')
+        .withIndex('by_campaign', (q) => q.eq('campaignId', campaign.metaId))
+        .collect(),
+    ])
+    await Promise.all(
+      [...stats, ...ads, ...adDaily].map((r) => ctx.db.delete(r._id)),
+    )
     await ctx.db.delete(id)
+  },
+})
+
+// Détail d'une campagne : infos, séries quotidiennes et créatives agrégées 30 j.
+export const campaignDetail = query({
+  args: { metaId: v.string() },
+  handler: async (ctx, { metaId }) => {
+    const campaign = await ctx.db
+      .query('campaigns')
+      .withIndex('by_meta', (q) => q.eq('metaId', metaId))
+      .unique()
+    if (!campaign) return null
+
+    const client = await ctx.db
+      .query('clients')
+      .withIndex('by_slug', (q) => q.eq('slug', campaign.clientSlug))
+      .unique()
+
+    const [ads, adDaily, daily] = await Promise.all([
+      ctx.db
+        .query('ads')
+        .withIndex('by_campaign', (q) => q.eq('campaignId', metaId))
+        .collect(),
+      ctx.db
+        .query('adDaily')
+        .withIndex('by_campaign', (q) => q.eq('campaignId', metaId))
+        .collect(),
+      ctx.db
+        .query('dailyStats')
+        .withIndex('by_campaign_date', (q) => q.eq('campaignId', metaId))
+        .collect(),
+    ])
+
+    const cut30 = new Date(Date.now() - 30 * 86_400_000)
+      .toISOString()
+      .slice(0, 10)
+
+    const byAd = new Map<
+      string,
+      { spend: number; impressions: number; clicks: number; leads: number }
+    >()
+    let impressions = 0
+    let clicks = 0
+    for (const r of adDaily) {
+      if (r.date <= cut30) continue
+      const agg = byAd.get(r.adId) ?? {
+        spend: 0,
+        impressions: 0,
+        clicks: 0,
+        leads: 0,
+      }
+      agg.spend += r.spend
+      agg.impressions += r.impressions
+      agg.clicks += r.clicks
+      agg.leads += r.leads
+      byAd.set(r.adId, agg)
+      impressions += r.impressions
+      clicks += r.clicks
+    }
+
+    const recent = daily.filter((r) => r.date > cut30)
+    const spend = recent.reduce((s, r) => s + r.spend, 0)
+    const leads = recent.reduce((s, r) => s + r.leads, 0)
+
+    const adInfo = new Map(ads.map((a) => [a.adId, a]))
+
+    return {
+      metaId,
+      name: campaign.name ?? `Campagne ${metaId}`,
+      status: campaign.status ?? null,
+      lastSyncedAt: campaign.lastSyncedAt ?? null,
+      syncError: campaign.syncError ?? null,
+      client: client
+        ? {
+            slug: client.slug,
+            name: client.name,
+            kind: client.kind ?? 'client',
+          }
+        : null,
+      totals: {
+        spend,
+        leads,
+        cpl: leads > 0 ? spend / leads : null,
+        impressions,
+        clicks,
+        ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+        cpc: clicks > 0 ? spend / clicks : null,
+      },
+      daily: recent
+        .map((r) => ({ date: r.date, spend: r.spend, leads: r.leads }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      creatives: [...byAd.entries()]
+        .map(([adId, agg]) => {
+          const info = adInfo.get(adId)
+          return {
+            adId,
+            name: info?.name ?? `Créative ${adId}`,
+            status: info?.status ?? null,
+            thumbnailUrl: info?.thumbnailUrl ?? null,
+            spend: agg.spend,
+            impressions: agg.impressions,
+            clicks: agg.clicks,
+            ctr:
+              agg.impressions > 0 ? (agg.clicks / agg.impressions) * 100 : null,
+            cpc: agg.clicks > 0 ? agg.spend / agg.clicks : null,
+            leads: agg.leads,
+            cpl: agg.leads > 0 ? agg.spend / agg.leads : null,
+          }
+        })
+        .sort((a, b) => b.spend - a.spend),
+    }
   },
 })

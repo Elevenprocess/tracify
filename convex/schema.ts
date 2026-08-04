@@ -34,6 +34,31 @@ export default defineSchema({
     .index('by_client', ['clientSlug'])
     .index('by_meta', ['metaId']),
 
+  // Créatives (ads) d'une campagne Meta, avec miniature.
+  ads: defineTable({
+    campaignId: v.string(),
+    adId: v.string(),
+    name: v.optional(v.string()),
+    status: v.optional(v.string()),
+    thumbnailUrl: v.optional(v.string()),
+    updatedAt: v.string(),
+  })
+    .index('by_campaign', ['campaignId'])
+    .index('by_ad', ['adId']),
+
+  // Lignes quotidiennes par créative (niveau ad de la Graph API).
+  adDaily: defineTable({
+    campaignId: v.string(),
+    adId: v.string(),
+    date: v.string(),
+    spend: v.number(),
+    impressions: v.number(),
+    clicks: v.number(),
+    leads: v.number(),
+  })
+    .index('by_ad_date', ['adId', 'date'])
+    .index('by_campaign', ['campaignId']),
+
   // Agrégats quotidiens (dépense € / prospects), date en YYYY-MM-DD.
   // campaignId présent pour les lignes synchronisées depuis Meta.
   dailyStats: defineTable({
