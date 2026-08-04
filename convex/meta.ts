@@ -363,6 +363,21 @@ export const syncCampaign = internalAction({
   },
 })
 
+// Ping d'un chemin non mis en cache : réveille la fonction SSR Vercel pour
+// éviter le démarrage à froid au premier visiteur.
+export const keepWarm = internalAction({
+  args: {},
+  handler: async () => {
+    try {
+      await fetch('https://tracify-eta.vercel.app/keep-warm', {
+        headers: { 'user-agent': 'tracify-keepwarm' },
+      })
+    } catch (e) {
+      console.warn('keepWarm :', e)
+    }
+  },
+})
+
 // Vérifie qu'un compte publicitaire est accessible avec le token.
 export const assertAdAccount = internalAction({
   args: { account: v.string() },

@@ -13,7 +13,18 @@ const config = defineConfig({
     devtools(),
     tailwindcss(),
     tanstackStart(),
-    nitroV2Plugin({ preset: 'vercel' }),
+    nitroV2Plugin({
+      preset: 'vercel',
+      // Cache en périphérie (ISR) : la page est servie instantanément depuis
+      // le CDN et se régénère en arrière-plan ; le websocket Convex rafraîchit
+      // de toute façon les chiffres en direct après l'affichage.
+      routeRules: {
+        '/': { swr: 300 },
+        '/dashboard': { swr: 60 },
+        '/clients/**': { swr: 60 },
+        '/campagnes/**': { swr: 60 },
+      },
+    }),
     viteReact(),
   ],
 })
