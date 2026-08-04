@@ -47,7 +47,9 @@ const Prism = ({
     const HOVSTR = Math.max(0, hoverStrength || 1)
     const INERT = Math.max(0, Math.min(1, inertia || 0.12))
 
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    // Rendu en 1x : l'effet est un halo diffus, le sur-échantillonnage Retina
+    // quadruplait le coût du raymarching sans gain visuel perceptible.
+    const dpr = 1
     let renderer
     try {
       renderer = new Renderer({

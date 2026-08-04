@@ -32,11 +32,12 @@ function Landing() {
             timeScale={0.4}
             height={4}
             baseWidth={4.6}
-            scale={3.5}
+            scale={2.7}
             hueShift={0.3584}
             colorFrequency={1}
             noise={0}
             glow={1.1}
+            suspendWhenOffscreen
           />
         </div>
 
