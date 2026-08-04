@@ -5,14 +5,39 @@ import { v } from 'convex/values'
 export const overview = query({
   args: {},
   handler: async (ctx) => {
-    const [clients, daily] = await Promise.all([
+    const [clients, daily, campaigns] = await Promise.all([
       ctx.db.query('clients').collect(),
       ctx.db.query('dailyStats').collect(),
+      ctx.db.query('campaigns').collect(),
     ])
+
+    const activeByClient = new Map<string, number>()
+    for (const c of campaigns) {
+      if (c.status && c.status !== 'ACTIVE') continue
+      activeByClient.set(
+        c.clientSlug,
+        (activeByClient.get(c.clientSlug) ?? 0) + 1,
+      )
+    }
+
+    // Fenêtres : 30 derniers jours (affichés) vs 30 jours précédents (deltas)
+    const dayKey = (msAgo: number) =>
+      new Date(Date.now() - msAgo).toISOString().slice(0, 10)
+    const cut30 = dayKey(30 * 86_400_000)
+    const cut60 = dayKey(60 * 86_400_000)
 
     const byClient = new Map<string, { spend: number; leads: number }>()
     const byDate = new Map<string, { spend: number; leads: number }>()
+    let prevSpend = 0
+    let prevLeads = 0
     for (const row of daily) {
+      if (row.date <= cut30) {
+        if (row.date > cut60) {
+          prevSpend += row.spend
+          prevLeads += row.leads
+        }
+        continue
+      }
       const c = byClient.get(row.clientSlug) ?? { spend: 0, leads: 0 }
       c.spend += row.spend
       c.leads += row.leads
@@ -24,7 +49,25 @@ export const overview = query({
       byDate.set(row.date, d)
     }
 
+    const curSpend = [...byClient.values()].reduce((s, c) => s + c.spend, 0)
+    const curLeads = [...byClient.values()].reduce((s, c) => s + c.leads, 0)
+    const pct = (cur: number, prev: number) =>
+      prev > 0 ? ((cur - prev) / prev) * 100 : null
+    const curCpl = curLeads > 0 ? curSpend / curLeads : null
+    const prevCpl = prevLeads > 0 ? prevSpend / prevLeads : null
+
     return {
+      totals: {
+        spend: curSpend,
+        leads: curLeads,
+        cpl: curCpl,
+        spendDelta: pct(curSpend, prevSpend),
+        leadsDelta: pct(curLeads, prevLeads),
+        cplDelta:
+          curCpl !== null && prevCpl !== null
+            ? ((curCpl - prevCpl) / prevCpl) * 100
+            : null,
+      },
       clients: clients
         .map((c) => {
           const agg = byClient.get(c.slug) ?? { spend: 0, leads: 0 }
@@ -33,7 +76,8 @@ export const overview = query({
             name: c.name,
             sector: c.sector,
             status: c.status,
-            activeCampaigns: c.activeCampaigns,
+            activeCampaigns:
+              activeByClient.get(c.slug) ?? c.activeCampaigns ?? 0,
             spend30d: agg.spend,
             leads30d: agg.leads,
             cpl: agg.leads > 0 ? agg.spend / agg.leads : null,
@@ -57,7 +101,7 @@ export const client = query({
       .unique()
     if (!client) return null
 
-    const [daily, sources, prospects] = await Promise.all([
+    const [daily, sources, prospects, campaigns] = await Promise.all([
       ctx.db
         .query('dailyStats')
         .withIndex('by_client_date', (q) => q.eq('clientSlug', slug))
@@ -70,10 +114,18 @@ export const client = query({
         .query('prospects')
         .withIndex('by_client', (q) => q.eq('clientSlug', slug))
         .collect(),
+      ctx.db
+        .query('campaigns')
+        .withIndex('by_client', (q) => q.eq('clientSlug', slug))
+        .collect(),
     ])
 
-    const spend30d = daily.reduce((s, r) => s + r.spend, 0)
-    const leads30d = daily.reduce((s, r) => s + r.leads, 0)
+    const cut30 = new Date(Date.now() - 30 * 86_400_000)
+      .toISOString()
+      .slice(0, 10)
+    const recent = daily.filter((r) => r.date > cut30)
+    const spend30d = recent.reduce((s, r) => s + r.spend, 0)
+    const leads30d = recent.reduce((s, r) => s + r.leads, 0)
 
     // Regroupement par semaine ISO (lundi comme premier jour)
     const weeks = new Map<
@@ -101,17 +153,20 @@ export const client = query({
       name: client.name,
       sector: client.sector,
       status: client.status,
-      activeCampaigns: client.activeCampaigns,
+      activeCampaigns:
+        campaigns.filter((c) => !c.status || c.status === 'ACTIVE').length ||
+        (client.activeCampaigns ?? 0),
       spend30d,
       leads30d,
       cpl: leads30d > 0 ? spend30d / leads30d : null,
-      // On écarte la semaine en cours (incomplète) pour ne pas fausser la lecture
+      // On écarte la semaine en cours (incomplète) et on garde les 4 dernières
       weeklyLeads: [...weeks.values()]
         .filter((w) => {
           const lastDate = daily.reduce((m, r) => (r.date > m ? r.date : m), '')
           return w.end <= lastDate
         })
-        .sort((a, b) => a.start.localeCompare(b.start)),
+        .sort((a, b) => a.start.localeCompare(b.start))
+        .slice(-4),
       sources: sources
         .map((s) => ({ label: s.source, value: s.count }))
         .sort((a, b) => b.value - a.value),

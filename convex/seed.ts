@@ -244,6 +244,24 @@ const PROSPECTS: Record<string, Array<SeedProspect>> = {
   ],
 }
 
+// Vide toutes les tables (bascule maquette → données réelles).
+export const clearAll = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    for (const table of [
+      'clients',
+      'campaigns',
+      'dailyStats',
+      'sourceStats',
+      'prospects',
+    ] as const) {
+      const rows = await ctx.db.query(table).collect()
+      await Promise.all(rows.map((r) => ctx.db.delete(r._id)))
+    }
+    return 'cleared'
+  },
+})
+
 export const run = internalMutation({
   args: {},
   handler: async (ctx) => {

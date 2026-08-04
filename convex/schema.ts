@@ -13,18 +13,35 @@ export default defineSchema({
       v.literal('paused'),
       v.literal('ended'),
     ),
-    activeCampaigns: v.number(),
+    activeCampaigns: v.optional(v.number()),
     createdAt: v.string(),
   }).index('by_slug', ['slug']),
 
-  // Agrégats quotidiens par client (dépense € / prospects), date en YYYY-MM-DD
+  // Campagnes Meta rattachées à un client — un simple ID de campagne suffit,
+  // la sync récupère le nom, le statut et les stats depuis la Graph API.
+  campaigns: defineTable({
+    clientSlug: v.string(),
+    metaId: v.string(),
+    name: v.optional(v.string()),
+    status: v.optional(v.string()),
+    lastSyncedAt: v.optional(v.string()),
+    syncError: v.optional(v.string()),
+    createdAt: v.string(),
+  })
+    .index('by_client', ['clientSlug'])
+    .index('by_meta', ['metaId']),
+
+  // Agrégats quotidiens (dépense € / prospects), date en YYYY-MM-DD.
+  // campaignId présent pour les lignes synchronisées depuis Meta.
   dailyStats: defineTable({
     clientSlug: v.string(),
+    campaignId: v.optional(v.string()),
     date: v.string(),
     spend: v.number(),
     leads: v.number(),
   })
     .index('by_client_date', ['clientSlug', 'date'])
+    .index('by_campaign_date', ['campaignId', 'date'])
     .index('by_date', ['date']),
 
   // Répartition des prospects par source sur 30 j (agrégat seedé pour la maquette)

@@ -8,19 +8,25 @@
  * @module
  */
 
-import type * as dashboard from "../dashboard.js";
-import type * as seed from "../seed.js";
+import type * as clients from '../clients.js'
+import type * as crons from '../crons.js'
+import type * as dashboard from '../dashboard.js'
+import type * as meta from '../meta.js'
+import type * as seed from '../seed.js'
 
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
-} from "convex/server";
+} from 'convex/server'
 
 declare const fullApi: ApiFromModules<{
-  dashboard: typeof dashboard;
-  seed: typeof seed;
-}>;
+  clients: typeof clients
+  crons: typeof crons
+  dashboard: typeof dashboard
+  meta: typeof meta
+  seed: typeof seed
+}>
 
 /**
  * A utility for referencing Convex functions in your app's public API.
@@ -32,8 +38,8 @@ declare const fullApi: ApiFromModules<{
  */
 export declare const api: FilterApi<
   typeof fullApi,
-  FunctionReference<any, "public">
->;
+  FunctionReference<any, 'public'>
+>
 
 /**
  * A utility for referencing Convex functions in your app's internal API.
@@ -45,7 +51,7 @@ export declare const api: FilterApi<
  */
 export declare const internal: FilterApi<
   typeof fullApi,
-  FunctionReference<any, "internal">
->;
+  FunctionReference<any, 'internal'>
+>
 
-export declare const components: {};
+export declare const components: {}

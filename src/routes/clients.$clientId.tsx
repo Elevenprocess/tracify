@@ -5,6 +5,8 @@ import KpiCard from '../components/KpiCard'
 import BarChart from '../components/charts/BarChart'
 import SourceSplit from '../components/charts/SourceSplit'
 import { CampaignBadge, ProspectBadge } from '../components/StatusBadge'
+import AppShell from '../components/AppShell'
+import CampaignsPanel from '../components/CampaignsPanel'
 import {
   ArrowLeftIcon,
   TargetIcon,
@@ -19,24 +21,28 @@ import {
 } from '../lib/format'
 
 export const Route = createFileRoute('/clients/$clientId')({
-  component: ClientDetail,
+  component: ClientDetailPage,
 })
+
+function ClientDetailPage() {
+  return (
+    <AppShell>
+      <ClientDetail />
+    </AppShell>
+  )
+}
 
 function ClientDetail() {
   const { clientId } = Route.useParams()
   const client = useQuery(api.dashboard.client, { slug: clientId })
 
   if (client === undefined) {
-    return (
-      <main className="page-wrap px-4 pb-10 pt-8">
-        <p className="demo-muted text-sm">Chargement des données…</p>
-      </main>
-    )
+    return <p className="demo-muted m-0 text-sm">Chargement des données…</p>
   }
 
   if (client === null) {
     return (
-      <main className="page-wrap px-4 py-16 text-center">
+      <main className="py-16 text-center">
         <h1 className="text-2xl font-bold text-[var(--sea-ink)]">
           Client introuvable
         </h1>
@@ -53,7 +59,7 @@ function ClientDetail() {
   }))
 
   return (
-    <main className="page-wrap px-4 pb-10 pt-8">
+    <main className="min-w-0">
       <header className="rise-in mb-6">
         <nav aria-label="Fil d'Ariane" className="mb-2 text-sm">
           <Link
@@ -76,6 +82,10 @@ function ClientDetail() {
           {client.activeCampaigns > 1 ? 's' : ''} · 30 derniers jours
         </p>
       </header>
+
+      <section className="mb-6">
+        <CampaignsPanel clientSlug={client.slug} />
+      </section>
 
       <section
         aria-label="Indicateurs clés"

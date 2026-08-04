@@ -4,25 +4,28 @@ import { api } from '../../convex/_generated/api'
 import KpiCard from '../components/KpiCard'
 import LineChart from '../components/charts/LineChart'
 import { CampaignBadge } from '../components/StatusBadge'
+import AppShell from '../components/AppShell'
 import { TargetIcon, UsersIcon, WalletIcon } from '../components/icons'
 import { formatDay, formatEuro, formatNumber } from '../lib/format'
 
-export const Route = createFileRoute('/dashboard')({ component: Dashboard })
+export const Route = createFileRoute('/dashboard')({ component: DashboardPage })
+
+function DashboardPage() {
+  return (
+    <AppShell>
+      <Dashboard />
+    </AppShell>
+  )
+}
 
 function Dashboard() {
   const data = useQuery(api.dashboard.overview)
 
   if (!data) {
-    return (
-      <main className="page-wrap px-4 pb-10 pt-8">
-        <p className="demo-muted text-sm">Chargement des données…</p>
-      </main>
-    )
+    return <p className="demo-muted m-0 text-sm">Chargement des données…</p>
   }
 
-  const totalSpend = data.clients.reduce((sum, c) => sum + c.spend30d, 0)
-  const totalLeads = data.clients.reduce((sum, c) => sum + c.leads30d, 0)
-  const avgCpl = totalLeads > 0 ? totalSpend / totalLeads : 0
+  const { totals } = data
 
   const spendSeries = data.daily.map((d) => ({
     label: formatDay(d.date),
@@ -34,7 +37,7 @@ function Dashboard() {
   }))
 
   return (
-    <main className="page-wrap px-4 pb-10 pt-8">
+    <main className="min-w-0">
       <header className="rise-in mb-6">
         <p className="island-kicker m-0 mb-1">
           Vue d'ensemble · 30 derniers jours
@@ -50,23 +53,23 @@ function Dashboard() {
       >
         <KpiCard
           label="Dépense publicitaire"
-          value={formatEuro(totalSpend)}
+          value={formatEuro(totals.spend)}
           icon={<WalletIcon />}
-          delta={6.4}
+          delta={totals.spendDelta ?? undefined}
           deltaLabel="vs 30 j précédents"
         />
         <KpiCard
           label="Prospects"
-          value={formatNumber(totalLeads)}
+          value={formatNumber(totals.leads)}
           icon={<UsersIcon />}
-          delta={11.2}
+          delta={totals.leadsDelta ?? undefined}
           deltaLabel="vs 30 j précédents"
         />
         <KpiCard
           label="Coût par prospect"
-          value={formatEuro(avgCpl)}
+          value={totals.cpl !== null ? formatEuro(totals.cpl) : '—'}
           icon={<TargetIcon />}
-          delta={-4.3}
+          delta={totals.cplDelta ?? undefined}
           deltaLabel="vs 30 j précédents"
           deltaGoodWhenDown
         />
