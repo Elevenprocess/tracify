@@ -19,11 +19,14 @@ import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/clients/$clientId')({
   loader: async ({ params }) => {
-    const [initial, sidebar] = await Promise.all([
+    const [initial, sidebar, campaignsInitial] = await Promise.all([
       convexHttp.query(api.dashboard.client, { slug: params.clientId }),
       convexHttp.query(api.clients.list, {}),
+      convexHttp.query(api.meta.campaignsByClient, {
+        clientSlug: params.clientId,
+      }),
     ])
-    return { initial, sidebar }
+    return { initial, sidebar, campaignsInitial }
   },
   component: ClientDetailPage,
 })
@@ -39,7 +42,7 @@ function ClientDetailPage() {
 
 function ClientDetail() {
   const { clientId } = Route.useParams()
-  const { initial } = Route.useLoaderData()
+  const { initial, campaignsInitial } = Route.useLoaderData()
   const live = useQuery(api.dashboard.client, { slug: clientId })
   const client = live === undefined ? initial : live
   const removeClient = useMutation(api.clients.remove)
@@ -115,6 +118,7 @@ function ClientDetail() {
         <CampaignsPanel
           clientSlug={client.slug}
           adAccountId={client.adAccountId}
+          initial={campaignsInitial}
         />
       </section>
 

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useAction, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
 import { MegaphoneIcon } from './icons'
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -10,14 +11,26 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   PAUSED: { label: 'En pause', color: 'var(--status-warn)' },
 }
 
+export interface CampaignItem {
+  id: Id<'campaigns'>
+  metaId: string
+  name: string | null
+  status: string | null
+  lastSyncedAt: string | null
+  syncError: string | null
+}
+
 export default function CampaignsPanel({
   clientSlug,
   adAccountId,
+  initial,
 }: {
   clientSlug: string
   adAccountId: string | null
+  initial?: Array<CampaignItem>
 }) {
-  const campaigns = useQuery(api.meta.campaignsByClient, { clientSlug })
+  const live = useQuery(api.meta.campaignsByClient, { clientSlug })
+  const campaigns = live ?? initial
 
   return (
     <article className="island-shell rise-in rounded-2xl p-5">
