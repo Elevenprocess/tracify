@@ -7,11 +7,24 @@ import { BriefcaseIcon, FolderIcon, GridIcon, PlusIcon } from './icons'
 
 type Kind = 'client' | 'project'
 
+export interface SidebarEntry {
+  slug: string
+  name: string
+  status: 'active' | 'paused' | 'ended'
+  kind: Kind
+}
+
 // Sidebar dockée au bord de l'écran, contenu à droite avec sa propre largeur max.
-export default function AppShell({ children }: { children: ReactNode }) {
+export default function AppShell({
+  children,
+  sidebarInitial,
+}: {
+  children: ReactNode
+  sidebarInitial?: Array<SidebarEntry>
+}) {
   return (
     <div className="flex flex-1 flex-col lg:flex-row">
-      <Sidebar />
+      <Sidebar initial={sidebarInitial} />
       <div className="min-w-0 flex-1">
         <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
           {children}
@@ -21,8 +34,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   )
 }
 
-function Sidebar() {
-  const entries = useQuery(api.clients.list)
+function Sidebar({ initial }: { initial?: Array<SidebarEntry> }) {
+  const live = useQuery(api.clients.list)
+  const entries = live ?? initial
   const projects = (entries ?? []).filter((e) => e.kind === 'project')
   const clients = (entries ?? []).filter((e) => e.kind !== 'project')
 

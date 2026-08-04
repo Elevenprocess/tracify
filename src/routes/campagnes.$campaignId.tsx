@@ -21,11 +21,15 @@ import {
 import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/campagnes/$campaignId')({
-  loader: async ({ params }) => ({
-    initial: await convexHttp.query(api.meta.campaignDetail, {
-      metaId: params.campaignId,
-    }),
-  }),
+  loader: async ({ params }) => {
+    const [initial, sidebar] = await Promise.all([
+      convexHttp.query(api.meta.campaignDetail, {
+        metaId: params.campaignId,
+      }),
+      convexHttp.query(api.clients.list, {}),
+    ])
+    return { initial, sidebar }
+  },
   component: CampaignPage,
 })
 
@@ -35,8 +39,9 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 }
 
 function CampaignPage() {
+  const { sidebar } = Route.useLoaderData()
   return (
-    <AppShell>
+    <AppShell sidebarInitial={sidebar}>
       <CampaignDetail />
     </AppShell>
   )

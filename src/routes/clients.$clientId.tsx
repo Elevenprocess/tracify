@@ -20,20 +20,22 @@ import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/clients/$clientId')({
   loader: async ({ params }) => {
-    const [initial, prospectsInitial] = await Promise.all([
+    const [initial, prospectsInitial, sidebar] = await Promise.all([
       convexHttp.query(api.dashboard.client, { slug: params.clientId }),
       convexHttp.query(api.prospects.byClient, {
         clientSlug: params.clientId,
       }),
+      convexHttp.query(api.clients.list, {}),
     ])
-    return { initial, prospectsInitial }
+    return { initial, prospectsInitial, sidebar }
   },
   component: ClientDetailPage,
 })
 
 function ClientDetailPage() {
+  const { sidebar } = Route.useLoaderData()
   return (
-    <AppShell>
+    <AppShell sidebarInitial={sidebar}>
       <ClientDetail />
     </AppShell>
   )

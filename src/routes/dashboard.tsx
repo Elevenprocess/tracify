@@ -12,15 +12,20 @@ import { convexHttp } from '../lib/convexServer'
 export const Route = createFileRoute('/dashboard')({
   // Les données arrivent avec la page (SSR + préchargement au survol) ;
   // le websocket Convex prend ensuite le relais pour le temps réel.
-  loader: async () => ({
-    initial: await convexHttp.query(api.dashboard.overview, {}),
-  }),
+  loader: async () => {
+    const [initial, sidebar] = await Promise.all([
+      convexHttp.query(api.dashboard.overview, {}),
+      convexHttp.query(api.clients.list, {}),
+    ])
+    return { initial, sidebar }
+  },
   component: DashboardPage,
 })
 
 function DashboardPage() {
+  const { sidebar } = Route.useLoaderData()
   return (
-    <AppShell>
+    <AppShell sidebarInitial={sidebar}>
       <Dashboard />
     </AppShell>
   )
