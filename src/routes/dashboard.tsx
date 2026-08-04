@@ -93,7 +93,7 @@ function Dashboard() {
       )}
 
       <section className="mt-6">
-        <h2 className="demo-section-title mb-3">Clients</h2>
+        <h2 className="demo-section-title mb-3">Projets & clients</h2>
         <div className="demo-table-shell island-shell rounded-2xl">
           <table className="demo-table min-w-[640px] text-sm">
             <thead>

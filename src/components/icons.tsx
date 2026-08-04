@@ -92,6 +92,14 @@ export function GridIcon({ className = 'h-4 w-4' }: IconProps) {
   )
 }
 
+export function FolderIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+    </svg>
+  )
+}
+
 export function BriefcaseIcon({ className = 'h-4 w-4' }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

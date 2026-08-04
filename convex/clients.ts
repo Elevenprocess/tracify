@@ -16,15 +16,24 @@ export const list = query({
   handler: async (ctx) => {
     const clients = await ctx.db.query('clients').collect()
     return clients
-      .map((c) => ({ slug: c.slug, name: c.name, status: c.status }))
+      .map((c) => ({
+        slug: c.slug,
+        name: c.name,
+        status: c.status,
+        kind: c.kind ?? 'client',
+      }))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
   },
 })
 
-// Création manuelle d'un client (depuis la sidebar)
+// Création manuelle d'un client ou d'un projet (depuis la sidebar)
 export const create = mutation({
-  args: { name: v.string(), sector: v.optional(v.string()) },
-  handler: async (ctx, { name, sector }) => {
+  args: {
+    name: v.string(),
+    sector: v.optional(v.string()),
+    kind: v.optional(v.union(v.literal('client'), v.literal('project'))),
+  },
+  handler: async (ctx, { name, sector, kind }) => {
     const trimmed = name.trim()
     if (!trimmed) throw new Error('Le nom du client est requis.')
 
@@ -38,10 +47,27 @@ export const create = mutation({
     await ctx.db.insert('clients', {
       slug,
       name: trimmed,
+      kind: kind ?? 'client',
       sector: sector?.trim() || 'Non renseigné',
       status: 'active',
       createdAt: new Date().toISOString(),
     })
     return { slug }
+  },
+})
+
+// Basculer un enregistrement entre projet et client
+export const setKind = mutation({
+  args: {
+    slug: v.string(),
+    kind: v.union(v.literal('client'), v.literal('project')),
+  },
+  handler: async (ctx, { slug, kind }) => {
+    const row = await ctx.db
+      .query('clients')
+      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .unique()
+    if (!row) throw new Error('Introuvable')
+    await ctx.db.patch(row._id, { kind })
   },
 })

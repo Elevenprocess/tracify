@@ -7,6 +7,9 @@ export default defineSchema({
   clients: defineTable({
     slug: v.string(),
     name: v.string(),
+    // 'project' = projet propre d'Erwan ; 'client' = client externe qui
+    // commande des publicités. Absent = client.
+    kind: v.optional(v.union(v.literal('client'), v.literal('project'))),
     sector: v.string(),
     status: v.union(
       v.literal('active'),
