@@ -3,6 +3,7 @@ import { useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import AppShell from '../components/AppShell'
 import KpiCard from '../components/KpiCard'
+import ProspectsBoard from '../components/ProspectsBoard'
 import LineChart from '../components/charts/LineChart'
 import {
   ArrowLeftIcon,
@@ -22,13 +23,16 @@ import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/campagnes/$campaignId')({
   loader: async ({ params }) => {
-    const [initial, sidebar] = await Promise.all([
+    const [initial, sidebar, prospectsInitial] = await Promise.all([
       convexHttp.query(api.meta.campaignDetail, {
         metaId: params.campaignId,
       }),
       convexHttp.query(api.clients.list, {}),
+      convexHttp.query(api.prospects.byCampaign, {
+        campaignId: params.campaignId,
+      }),
     ])
-    return { initial, sidebar }
+    return { initial, sidebar, prospectsInitial }
   },
   component: CampaignPage,
 })
@@ -49,7 +53,7 @@ function CampaignPage() {
 
 function CampaignDetail() {
   const { campaignId } = Route.useParams()
-  const { initial } = Route.useLoaderData()
+  const { initial, prospectsInitial } = Route.useLoaderData()
   const live = useQuery(api.meta.campaignDetail, { metaId: campaignId })
   const data = live === undefined ? initial : live
 
@@ -256,6 +260,8 @@ function CampaignDetail() {
           </table>
         </div>
       </section>
+
+      <ProspectsBoard campaignId={data.metaId} initial={prospectsInitial} />
     </main>
   )
 }

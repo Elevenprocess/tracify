@@ -84,6 +84,8 @@ export default defineSchema({
 
   prospects: defineTable({
     clientSlug: v.string(),
+    // Campagne Meta à laquelle le prospect est rattaché (CRM par campagne)
+    campaignId: v.optional(v.string()),
     name: v.string(),
     phone: v.string(),
     date: v.string(),
@@ -96,5 +98,7 @@ export default defineSchema({
       v.literal('lost'),
     ),
     createdAt: v.string(),
-  }).index('by_client', ['clientSlug']),
+  })
+    .index('by_client', ['clientSlug'])
+    .index('by_campaign', ['campaignId']),
 })

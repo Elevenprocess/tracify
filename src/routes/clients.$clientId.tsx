@@ -7,7 +7,6 @@ import SourceSplit from '../components/charts/SourceSplit'
 import { CampaignBadge } from '../components/StatusBadge'
 import AppShell from '../components/AppShell'
 import CampaignsPanel from '../components/CampaignsPanel'
-import ProspectsBoard from '../components/ProspectsBoard'
 import {
   ArrowLeftIcon,
   TargetIcon,
@@ -20,14 +19,11 @@ import { convexHttp } from '../lib/convexServer'
 
 export const Route = createFileRoute('/clients/$clientId')({
   loader: async ({ params }) => {
-    const [initial, prospectsInitial, sidebar] = await Promise.all([
+    const [initial, sidebar] = await Promise.all([
       convexHttp.query(api.dashboard.client, { slug: params.clientId }),
-      convexHttp.query(api.prospects.byClient, {
-        clientSlug: params.clientId,
-      }),
       convexHttp.query(api.clients.list, {}),
     ])
-    return { initial, prospectsInitial, sidebar }
+    return { initial, sidebar }
   },
   component: ClientDetailPage,
 })
@@ -43,7 +39,7 @@ function ClientDetailPage() {
 
 function ClientDetail() {
   const { clientId } = Route.useParams()
-  const { initial, prospectsInitial } = Route.useLoaderData()
+  const { initial } = Route.useLoaderData()
   const live = useQuery(api.dashboard.client, { slug: clientId })
   const client = live === undefined ? initial : live
   const removeClient = useMutation(api.clients.remove)
@@ -161,8 +157,6 @@ function ClientDetail() {
           )}
         </article>
       </section>
-
-      <ProspectsBoard clientSlug={client.slug} initial={prospectsInitial} />
     </main>
   )
 }

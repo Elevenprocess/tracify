@@ -29,13 +29,13 @@ const COLUMNS: Array<{
 ]
 
 export default function ProspectsBoard({
-  clientSlug,
+  campaignId,
   initial,
 }: {
-  clientSlug: string
+  campaignId: string
   initial?: Array<Prospect>
 }) {
-  const live = useQuery(api.prospects.byClient, { clientSlug })
+  const live = useQuery(api.prospects.byCampaign, { campaignId })
   const prospects = live ?? initial ?? []
   const setStatus = useMutation(api.prospects.setStatus)
   const removeProspect = useMutation(api.prospects.remove)
@@ -56,7 +56,7 @@ export default function ProspectsBoard({
           <UsersIcon className="h-4 w-4 text-[var(--lagoon)]" />
           CRM prospects
         </h2>
-        <AddProspectForm clientSlug={clientSlug} />
+        <AddProspectForm campaignId={campaignId} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -160,7 +160,7 @@ export default function ProspectsBoard({
   )
 }
 
-function AddProspectForm({ clientSlug }: { clientSlug: string }) {
+function AddProspectForm({ campaignId }: { campaignId: string }) {
   const addProspect = useMutation(api.prospects.add)
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -172,7 +172,7 @@ function AddProspectForm({ clientSlug }: { clientSlug: string }) {
     if (saving) return
     setSaving(true)
     try {
-      await addProspect({ clientSlug, name, phone: phone || undefined })
+      await addProspect({ campaignId, name, phone: phone || undefined })
       setName('')
       setPhone('')
       setOpen(false)
