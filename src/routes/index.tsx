@@ -25,7 +25,7 @@ function Landing() {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Hero plein écran avec le fond animé */}
-      <section className="relative h-screen w-full overflow-hidden">
+      <section className="relative h-svh w-full overflow-hidden">
         <div className="absolute inset-0">
           <Prism
             animationType="rotate"
@@ -60,9 +60,10 @@ function Landing() {
               </a>
               <Link
                 to="/dashboard"
-                className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-black no-underline transition-transform hover:-translate-y-0.5"
+                className="rounded-xl bg-white px-3 py-2 text-sm font-bold text-black no-underline transition-transform hover:-translate-y-0.5 sm:px-4"
               >
-                Ouvrir le dashboard
+                <span className="hidden sm:inline">Ouvrir le dashboard</span>
+                <span className="sm:hidden">Dashboard</span>
               </Link>
             </div>
           </div>
@@ -70,29 +71,29 @@ function Landing() {
 
         {/* Contenu du hero — laisse passer le clic maintenu vers l'animation */}
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-4 text-center">
-          <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] py-1.5 pl-1.5 pr-4 text-sm text-white/60 backdrop-blur-md">
-            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold tracking-wide text-black">
+          <p className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] py-1.5 pl-1.5 pr-3 text-xs text-white/60 backdrop-blur-md sm:mb-6 sm:pr-4 sm:text-sm">
+            <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-bold tracking-wide text-black sm:px-2.5 sm:text-xs">
               NOUVEAU
             </span>
             Suivi des campagnes en temps réel
           </p>
-          <h1 className="m-0 max-w-3xl text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl">
+          <h1 className="m-0 max-w-3xl text-[clamp(1.75rem,4vw+1rem,3.75rem)] font-bold leading-[1.08] tracking-tight">
             Toutes vos campagnes clients. Une seule plateforme.
           </h1>
-          <p className="mt-5 max-w-xl text-base text-white/60 sm:text-lg">
+          <p className="mt-4 max-w-xl text-[clamp(0.9375rem,1vw+0.6rem,1.125rem)] text-white/60 sm:mt-5">
             Tracify centralise la dépense publicitaire, les prospects et la
             performance de chaque client Eleven Process — en direct.
           </p>
-          <div className="pointer-events-auto mt-8 flex flex-wrap items-center justify-center gap-3">
+          <div className="pointer-events-auto mt-8 flex w-full max-w-xs flex-col items-stretch justify-center gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
             <Link
               to="/dashboard"
-              className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-black no-underline transition-transform hover:-translate-y-0.5"
+              className="rounded-xl bg-white px-6 py-3 text-center text-sm font-bold text-black no-underline transition-transform hover:-translate-y-0.5"
             >
               Accéder au tableau de bord
             </Link>
             <a
               href="#fonctionnalites"
-              className="rounded-xl border border-white/15 bg-white/[0.06] px-6 py-3 text-sm font-semibold text-white/80 no-underline backdrop-blur-md transition-colors hover:bg-white/[0.12] hover:text-white"
+              className="rounded-xl border border-white/15 bg-white/[0.06] px-6 py-3 text-center text-sm font-semibold text-white/80 no-underline backdrop-blur-md transition-colors hover:bg-white/[0.12] hover:text-white"
             >
               En savoir plus
             </a>
@@ -103,20 +104,20 @@ function Landing() {
       {/* Fonctionnalités */}
       <section
         id="fonctionnalites"
-        className="border-t border-white/10 bg-[#050508] px-4 py-20"
+        className="border-t border-white/10 bg-[#050508] px-4 py-14 sm:px-6 sm:py-20"
       >
         <div className="mx-auto max-w-5xl">
           <p className="m-0 mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#60d7cf]">
             Fonctionnalités
           </p>
-          <h2 className="m-0 mb-10 max-w-xl text-2xl font-bold tracking-tight sm:text-3xl">
+          <h2 className="m-0 mb-8 max-w-xl text-[clamp(1.375rem,2vw+0.75rem,1.875rem)] font-bold tracking-tight sm:mb-10">
             Le pilotage publicitaire, sans les allers-retours
           </h2>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3">
             {FEATURES.map((f) => (
               <article
                 key={f.title}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-white/20"
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 sm:p-6"
               >
                 <h3 className="m-0 mb-2 text-base font-semibold text-white">
                   {f.title}

@@ -226,7 +226,14 @@ const Prism = ({
         uInvHeight: { value: 1 / H },
         uMinAxis: { value: Math.min(BASE_HALF, H) },
         uPxScale: {
-          value: 1 / ((gl.drawingBufferHeight || 1) * 0.1 * SCALE),
+          value:
+            1 /
+            (Math.min(
+              gl.drawingBufferWidth || 1,
+              gl.drawingBufferHeight || 1,
+            ) *
+              0.1 *
+              SCALE),
         },
         uTimeScale: { value: TS },
       },
@@ -241,8 +248,13 @@ const Prism = ({
       iResBuf[1] = gl.drawingBufferHeight
       offsetPxBuf[0] = offX * dpr
       offsetPxBuf[1] = offY * dpr
+      // Dimensionne le prisme sur la plus petite dimension : en portrait
+      // (mobile) c'est la largeur qui borne, en paysage rien ne change.
       program.uniforms.uPxScale.value =
-        1 / ((gl.drawingBufferHeight || 1) * 0.1 * SCALE)
+        1 /
+        (Math.min(gl.drawingBufferWidth || 1, gl.drawingBufferHeight || 1) *
+          0.1 *
+          SCALE)
     }
     const ro = new ResizeObserver(resize)
     ro.observe(container)
