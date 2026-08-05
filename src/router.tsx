@@ -1,5 +1,6 @@
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
-import { ConvexProvider, ConvexReactClient } from 'convex/react'
+import { ConvexReactClient } from 'convex/react'
+import { ConvexAuthProvider } from '@convex-dev/auth/react'
 import { routeTree } from './routeTree.gen'
 
 export function getRouter() {
@@ -11,7 +12,7 @@ export function getRouter() {
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     Wrap: ({ children }) => (
-      <ConvexProvider client={convex}>{children}</ConvexProvider>
+      <ConvexAuthProvider client={convex}>{children}</ConvexAuthProvider>
     ),
   })
 

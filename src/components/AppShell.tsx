@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useAction, useQuery } from 'convex/react'
+import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../convex/_generated/api'
 import { BriefcaseIcon, FolderIcon, GridIcon, PlusIcon } from './icons'
 
@@ -70,8 +71,27 @@ function Sidebar({ initial }: { initial?: Array<SidebarEntry> }) {
           emptyLabel="Aucun client."
           addLabel="Nouveau client"
         />
+
+        <LogoutButton />
       </nav>
     </aside>
+  )
+}
+
+function LogoutButton() {
+  const { signOut } = useAuthActions()
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await signOut()
+        navigate({ to: '/login' })
+      }}
+      className="mt-auto flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--line)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--sea-ink-soft)] hover:text-[var(--sea-ink)]"
+    >
+      Se déconnecter
+    </button>
   )
 }
 

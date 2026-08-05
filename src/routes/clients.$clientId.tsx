@@ -15,36 +15,25 @@ import {
   WalletIcon,
 } from '../components/icons'
 import { formatDayRange, formatEuro, formatNumber } from '../lib/format'
-import { convexHttp } from '../lib/convexServer'
+import RequireAuth from '../components/RequireAuth'
 
 export const Route = createFileRoute('/clients/$clientId')({
-  loader: async ({ params }) => {
-    const [initial, sidebar, campaignsInitial] = await Promise.all([
-      convexHttp.query(api.dashboard.client, { slug: params.clientId }),
-      convexHttp.query(api.clients.list, {}),
-      convexHttp.query(api.meta.campaignsByClient, {
-        clientSlug: params.clientId,
-      }),
-    ])
-    return { initial, sidebar, campaignsInitial }
-  },
   component: ClientDetailPage,
 })
 
 function ClientDetailPage() {
-  const { sidebar } = Route.useLoaderData()
   return (
-    <AppShell sidebarInitial={sidebar}>
-      <ClientDetail />
-    </AppShell>
+    <RequireAuth>
+      <AppShell>
+        <ClientDetail />
+      </AppShell>
+    </RequireAuth>
   )
 }
 
 function ClientDetail() {
   const { clientId } = Route.useParams()
-  const { initial, campaignsInitial } = Route.useLoaderData()
-  const live = useQuery(api.dashboard.client, { slug: clientId })
-  const client = live === undefined ? initial : live
+  const client = useQuery(api.dashboard.client, { slug: clientId })
   const removeClient = useMutation(api.clients.remove)
   const navigate = useNavigate()
 
@@ -118,7 +107,6 @@ function ClientDetail() {
         <CampaignsPanel
           clientSlug={client.slug}
           adAccountId={client.adAccountId}
-          initial={campaignsInitial}
         />
       </section>
 

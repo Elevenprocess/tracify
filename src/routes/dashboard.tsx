@@ -7,34 +7,24 @@ import { CampaignBadge } from '../components/StatusBadge'
 import AppShell from '../components/AppShell'
 import { TargetIcon, UsersIcon, WalletIcon } from '../components/icons'
 import { formatDay, formatEuro, formatNumber } from '../lib/format'
-import { convexHttp } from '../lib/convexServer'
+import RequireAuth from '../components/RequireAuth'
 
 export const Route = createFileRoute('/dashboard')({
-  // Les données arrivent avec la page (SSR + préchargement au survol) ;
-  // le websocket Convex prend ensuite le relais pour le temps réel.
-  loader: async () => {
-    const [initial, sidebar] = await Promise.all([
-      convexHttp.query(api.dashboard.overview, {}),
-      convexHttp.query(api.clients.list, {}),
-    ])
-    return { initial, sidebar }
-  },
   component: DashboardPage,
 })
 
 function DashboardPage() {
-  const { sidebar } = Route.useLoaderData()
   return (
-    <AppShell sidebarInitial={sidebar}>
-      <Dashboard />
-    </AppShell>
+    <RequireAuth>
+      <AppShell>
+        <Dashboard />
+      </AppShell>
+    </RequireAuth>
   )
 }
 
 function Dashboard() {
-  const { initial } = Route.useLoaderData()
-  const live = useQuery(api.dashboard.overview)
-  const data = live ?? initial
+  const data = useQuery(api.dashboard.overview)
 
   if (!data) {
     return <p className="demo-muted m-0 text-sm">Chargement des données…</p>

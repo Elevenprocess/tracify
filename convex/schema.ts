@@ -1,9 +1,13 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
+import { authTables } from '@convex-dev/auth/server'
 
 // Piège connu : ne pas se servir de _creationTime pour les dates métier,
 // toujours stocker createdAt / date explicitement.
 export default defineSchema({
+  // Tables de Convex Auth (users, sessions, comptes OAuth…)
+  ...authTables,
+
   clients: defineTable({
     slug: v.string(),
     name: v.string(),

@@ -19,21 +19,9 @@ import {
   formatNumber,
   formatPercent,
 } from '../lib/format'
-import { convexHttp } from '../lib/convexServer'
+import RequireAuth from '../components/RequireAuth'
 
 export const Route = createFileRoute('/campagnes/$campaignId')({
-  loader: async ({ params }) => {
-    const [initial, sidebar, prospectsInitial] = await Promise.all([
-      convexHttp.query(api.meta.campaignDetail, {
-        metaId: params.campaignId,
-      }),
-      convexHttp.query(api.clients.list, {}),
-      convexHttp.query(api.prospects.byCampaign, {
-        campaignId: params.campaignId,
-      }),
-    ])
-    return { initial, sidebar, prospectsInitial }
-  },
   component: CampaignPage,
 })
 
@@ -43,19 +31,18 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 }
 
 function CampaignPage() {
-  const { sidebar } = Route.useLoaderData()
   return (
-    <AppShell sidebarInitial={sidebar}>
-      <CampaignDetail />
-    </AppShell>
+    <RequireAuth>
+      <AppShell>
+        <CampaignDetail />
+      </AppShell>
+    </RequireAuth>
   )
 }
 
 function CampaignDetail() {
   const { campaignId } = Route.useParams()
-  const { initial, prospectsInitial } = Route.useLoaderData()
-  const live = useQuery(api.meta.campaignDetail, { metaId: campaignId })
-  const data = live === undefined ? initial : live
+  const data = useQuery(api.meta.campaignDetail, { metaId: campaignId })
 
   if (data === undefined) {
     return <p className="demo-muted m-0 text-sm">Chargement des données…</p>
@@ -261,7 +248,7 @@ function CampaignDetail() {
         </div>
       </section>
 
-      <ProspectsBoard campaignId={data.metaId} initial={prospectsInitial} />
+      <ProspectsBoard campaignId={data.metaId} />
     </main>
   )
 }

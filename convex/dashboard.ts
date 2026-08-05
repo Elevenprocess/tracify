@@ -1,10 +1,12 @@
 import { query } from './_generated/server'
 import { v } from 'convex/values'
+import { requireUser } from './guard'
 
 // Vue d'ensemble : agrégats par client + série quotidienne globale
 export const overview = query({
   args: {},
   handler: async (ctx) => {
+    await requireUser(ctx)
     const [clients, daily, campaigns] = await Promise.all([
       ctx.db.query('clients').collect(),
       ctx.db.query('dailyStats').collect(),
@@ -95,6 +97,7 @@ export const overview = query({
 export const client = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
+    await requireUser(ctx)
     const client = await ctx.db
       .query('clients')
       .withIndex('by_slug', (q) => q.eq('slug', slug))

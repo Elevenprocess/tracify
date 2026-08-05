@@ -8,9 +8,12 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
 import type * as clients from "../clients.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
+import type * as guard from "../guard.js";
+import type * as http from "../http.js";
 import type * as meta from "../meta.js";
 import type * as prospects from "../prospects.js";
 import type * as seed from "../seed.js";
@@ -22,9 +25,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
   clients: typeof clients;
   crons: typeof crons;
   dashboard: typeof dashboard;
+  guard: typeof guard;
+  http: typeof http;
   meta: typeof meta;
   prospects: typeof prospects;
   seed: typeof seed;

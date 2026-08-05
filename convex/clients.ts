@@ -1,6 +1,7 @@
 import { action, internalMutation, mutation, query } from './_generated/server'
 import { internal } from './_generated/api'
 import { v } from 'convex/values'
+import { requireUser } from './guard'
 
 const slugify = (name: string) =>
   name
@@ -22,6 +23,7 @@ export function normalizeAdAccountId(raw: string): string | null {
 export const list = query({
   args: {},
   handler: async (ctx) => {
+    await requireUser(ctx)
     const clients = await ctx.db.query('clients').collect()
     return clients
       .map((c) => ({
@@ -87,6 +89,7 @@ export const createChecked = action({
     ctx,
     { name, adAccountId, kind },
   ): Promise<{ slug: string }> => {
+    await requireUser(ctx)
     const account = normalizeAdAccountId(adAccountId)
     if (!account)
       throw new Error(
@@ -114,6 +117,7 @@ export const createChecked = action({
 export const setAdAccountChecked = action({
   args: { slug: v.string(), adAccountId: v.string() },
   handler: async (ctx, { slug, adAccountId }): Promise<{ account: string }> => {
+    await requireUser(ctx)
     const account = normalizeAdAccountId(adAccountId)
     if (!account)
       throw new Error(
@@ -140,6 +144,7 @@ export const create = mutation({
     kind: v.optional(v.union(v.literal('client'), v.literal('project'))),
   },
   handler: async (ctx, { name, sector, kind }) => {
+    await requireUser(ctx)
     const trimmed = name.trim()
     if (!trimmed) throw new Error('Le nom du client est requis.')
 
@@ -167,6 +172,7 @@ export const create = mutation({
 export const remove = mutation({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
+    await requireUser(ctx)
     const client = await ctx.db
       .query('clients')
       .withIndex('by_slug', (q) => q.eq('slug', slug))
@@ -221,6 +227,7 @@ export const setKind = mutation({
     kind: v.union(v.literal('client'), v.literal('project')),
   },
   handler: async (ctx, { slug, kind }) => {
+    await requireUser(ctx)
     const row = await ctx.db
       .query('clients')
       .withIndex('by_slug', (q) => q.eq('slug', slug))

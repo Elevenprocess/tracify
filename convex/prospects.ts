@@ -1,5 +1,6 @@
 import { mutation, query } from './_generated/server'
 import { v } from 'convex/values'
+import { requireUser } from './guard'
 import type { Doc } from './_generated/dataModel'
 
 const STATUS = v.union(
@@ -23,6 +24,7 @@ const toCard = (p: Doc<'prospects'>) => ({
 export const byCampaign = query({
   args: { campaignId: v.string() },
   handler: async (ctx, { campaignId }) => {
+    await requireUser(ctx)
     const rows = await ctx.db
       .query('prospects')
       .withIndex('by_campaign', (q) => q.eq('campaignId', campaignId))
@@ -34,6 +36,7 @@ export const byCampaign = query({
 export const byClient = query({
   args: { clientSlug: v.string() },
   handler: async (ctx, { clientSlug }) => {
+    await requireUser(ctx)
     const rows = await ctx.db
       .query('prospects')
       .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
@@ -50,6 +53,7 @@ export const add = mutation({
     source: v.optional(v.string()),
   },
   handler: async (ctx, { campaignId, name, phone, source }) => {
+    await requireUser(ctx)
     const trimmed = name.trim()
     if (!trimmed) throw new Error('Le nom du prospect est requis.')
 
@@ -77,6 +81,7 @@ export const add = mutation({
 export const setStatus = mutation({
   args: { id: v.id('prospects'), status: STATUS },
   handler: async (ctx, { id, status }) => {
+    await requireUser(ctx)
     await ctx.db.patch(id, { status })
   },
 })
@@ -84,6 +89,7 @@ export const setStatus = mutation({
 export const remove = mutation({
   args: { id: v.id('prospects') },
   handler: async (ctx, { id }) => {
+    await requireUser(ctx)
     await ctx.db.delete(id)
   },
 })

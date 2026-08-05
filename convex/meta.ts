@@ -14,6 +14,7 @@ import {
 } from './_generated/server'
 import { internal } from './_generated/api'
 import { v } from 'convex/values'
+import { requireUser } from './guard'
 
 const GRAPH_BASE = 'https://graph.facebook.com/v21.0'
 // 62 jours pour pouvoir comparer les 30 derniers jours aux 30 précédents.
@@ -491,6 +492,7 @@ export const syncAll = internalAction({
 export const campaignsByClient = query({
   args: { clientSlug: v.string() },
   handler: async (ctx, { clientSlug }) => {
+    await requireUser(ctx)
     const rows = await ctx.db
       .query('campaigns')
       .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
@@ -549,6 +551,7 @@ export const insertCampaign = internalMutation({
 export const addCampaignChecked = action({
   args: { clientSlug: v.string(), metaId: v.string() },
   handler: async (ctx, { clientSlug, metaId }) => {
+    await requireUser(ctx)
     const cleaned = metaId.trim().replace(/\s/g, '')
     if (!/^\d{5,25}$/.test(cleaned))
       throw new Error(
@@ -597,6 +600,7 @@ export const addCampaignChecked = action({
 export const addCampaign = mutation({
   args: { clientSlug: v.string(), metaId: v.string() },
   handler: async (ctx, { clientSlug, metaId }) => {
+    await requireUser(ctx)
     const cleaned = metaId.trim().replace(/\s/g, '')
     if (!/^\d{5,25}$/.test(cleaned))
       throw new Error('ID de campagne Meta invalide (chiffres uniquement).')
@@ -624,6 +628,7 @@ export const addCampaign = mutation({
 export const removeCampaign = mutation({
   args: { id: v.id('campaigns') },
   handler: async (ctx, { id }) => {
+    await requireUser(ctx)
     const campaign = await ctx.db.get(id)
     if (!campaign) return
     const [stats, ads, adDaily] = await Promise.all([
@@ -653,6 +658,7 @@ export const removeCampaign = mutation({
 export const campaignDetail = query({
   args: { metaId: v.string() },
   handler: async (ctx, { metaId }) => {
+    await requireUser(ctx)
     const campaign = await ctx.db
       .query('campaigns')
       .withIndex('by_meta', (q) => q.eq('metaId', metaId))
