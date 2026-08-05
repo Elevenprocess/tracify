@@ -1,5 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import Prism from '../components/Prism/Prism'
+import BlurText from '../components/BlurText'
 
 export const Route = createFileRoute('/')({ component: Landing })
 
@@ -71,20 +72,20 @@ function Landing() {
 
         {/* Contenu du hero — laisse passer le clic maintenu vers l'animation */}
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-4 text-center">
-          <p className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] py-1.5 pl-1.5 pr-3 text-xs text-white/60 backdrop-blur-md sm:mb-6 sm:pr-4 sm:text-sm">
-            <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-bold tracking-wide text-black sm:px-2.5 sm:text-xs">
-              NOUVEAU
-            </span>
-            Suivi des campagnes en temps réel
-          </p>
-          <h1 className="m-0 max-w-3xl text-[clamp(1.75rem,4vw+1rem,3.75rem)] font-bold leading-[1.08] tracking-tight">
-            Toutes vos campagnes clients. Une seule plateforme.
-          </h1>
+          <BlurText
+            text="Toutes vos campagnes clients. Une seule plateforme."
+            delay={200}
+            animateBy="words"
+            direction="top"
+            className="m-0 max-w-3xl justify-center text-[clamp(1.75rem,4vw+1rem,3.75rem)] font-bold leading-[1.08] tracking-tight"
+          />
           <p className="mt-4 max-w-xl text-[clamp(0.9375rem,1vw+0.6rem,1.125rem)] text-white/60 sm:mt-5">
             Tracify centralise la dépense publicitaire, les prospects et la
             performance de chaque client Eleven Process — en direct.
           </p>
-          <div className="pointer-events-auto mt-8 flex w-full max-w-xs flex-col items-stretch justify-center gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
+          {/* Sur téléphone, les deux boutons sont ancrés en bas de l'écran ;
+              sur desktop ils restent sous le texte. */}
+          <div className="pointer-events-auto absolute inset-x-4 bottom-8 mx-auto flex max-w-xs flex-col items-stretch justify-center gap-3 sm:static sm:mt-8 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
             <Link
               to="/dashboard"
               className="rounded-xl bg-white px-6 py-3 text-center text-sm font-bold text-black no-underline transition-transform hover:-translate-y-0.5"

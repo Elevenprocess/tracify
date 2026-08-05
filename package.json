@@ -23,6 +23,7 @@
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/react-start": "latest",
     "convex": "^1.43.0",
+    "motion": "^12.43.0",
     "ogl": "^1.0.11",
     "postprocessing": "^6.39.4",
     "react": "^19.2.0",
