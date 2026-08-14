@@ -86,17 +86,16 @@ export default defineSchema({
     count: v.number(),
   }).index('by_client', ['clientSlug']),
 
-  // Codes d'accès client : un code actif par campagne, saisi sur la page de
-  // connexion pour ouvrir le suivi public de la campagne (lecture seule).
+  // Codes d'accès client : un code actif par client, saisi sur la page de
+  // connexion pour ouvrir le suivi public de ses campagnes (lecture seule).
   accessCodes: defineTable({
     code: v.string(),
-    // metaId de la campagne suivie
-    campaignId: v.string(),
+    clientSlug: v.string(),
     createdAt: v.string(),
     revokedAt: v.optional(v.string()),
   })
     .index('by_code', ['code'])
-    .index('by_campaign', ['campaignId']),
+    .index('by_client', ['clientSlug']),
 
   prospects: defineTable({
     clientSlug: v.string(),
