@@ -12,6 +12,7 @@ import {
   mutation,
   query,
 } from './_generated/server'
+import type { QueryCtx } from './_generated/server'
 import { internal } from './_generated/api'
 import { v } from 'convex/values'
 import { requireUser } from './guard'
@@ -152,7 +153,8 @@ async function fetchAdDetails(adIds: Array<string>) {
     if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text()}`)
     const json = (await res.json()) as Record<
       string,
-      { effective_status?: string; creative?: { thumbnail_url?: string } }
+      | { effective_status?: string; creative?: { thumbnail_url?: string } }
+      | undefined
     >
     for (const id of batch) {
       const d = json[id]
@@ -659,6 +661,13 @@ export const campaignDetail = query({
   args: { metaId: v.string() },
   handler: async (ctx, { metaId }) => {
     await requireUser(ctx)
+    return buildCampaignDetail(ctx, metaId)
+  },
+})
+
+// Corps du détail, partagé avec l'accès public par code (convex/access.ts).
+export async function buildCampaignDetail(ctx: QueryCtx, metaId: string) {
+  {
     const campaign = await ctx.db
       .query('campaigns')
       .withIndex('by_meta', (q) => q.eq('metaId', metaId))
@@ -763,5 +772,5 @@ export const campaignDetail = query({
         })
         .sort((a, b) => b.spend - a.spend),
     }
-  },
-})
+  }
+}

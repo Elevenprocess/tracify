@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import { Navigate, createFileRoute } from '@tanstack/react-router'
-import { useConvexAuth } from 'convex/react'
+import type { FormEvent } from 'react'
+import { Navigate, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useConvex, useConvexAuth } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { api } from '../../convex/_generated/api'
+import { TRACKING_CODE_KEY, normalizeTrackingCode } from '../lib/trackingCode'
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
@@ -29,7 +32,7 @@ function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-16">
+    <main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-16">
       <div className="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-8 text-center">
         <p className="island-kicker m-0 mb-1">Tracify</p>
         <h1 className="m-0 text-2xl font-bold tracking-tight text-[var(--sea-ink)]">
@@ -53,7 +56,78 @@ function LoginPage() {
           <p className="m-0 mt-4 text-sm text-[var(--status-warn)]">{error}</p>
         )}
       </div>
+
+      <TrackingCodeCard />
     </main>
+  )
+}
+
+// Accès client par code : le code généré sur la page campagne ouvre le suivi
+// public de la publicité, sans compte Google.
+function TrackingCodeCard() {
+  const convex = useConvex()
+  const navigate = useNavigate()
+  const [code, setCode] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    const cleaned = normalizeTrackingCode(code)
+    if (!cleaned) return
+    setChecking(true)
+    setError(null)
+    try {
+      const valid = await convex.query(api.access.check, { code: cleaned })
+      if (valid) {
+        localStorage.setItem(TRACKING_CODE_KEY, cleaned)
+        navigate({ to: '/suivi' })
+      } else {
+        setError('Code invalide ou désactivé. Vérifie auprès de ton contact.')
+      }
+    } catch {
+      setError('Vérification impossible. Réessaie dans un instant.')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <div className="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-8 text-center">
+      <h2 className="m-0 text-lg font-bold tracking-tight text-[var(--sea-ink)]">
+        Suivre ma publicité
+      </h2>
+      <p className="m-0 mt-2 text-sm text-[var(--sea-ink-soft)]">
+        Vous avez reçu un code de suivi ? Saisissez-le pour voir les résultats
+        de votre campagne.
+      </p>
+
+      <form onSubmit={onSubmit} className="mt-4 flex gap-2">
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Ex. K7F2QM"
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          maxLength={12}
+          aria-label="Code de suivi"
+          className="min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-transparent px-3 py-2.5 text-center font-mono text-sm font-bold uppercase tracking-[0.2em] text-[var(--sea-ink)] outline-none focus:border-[var(--lagoon)]"
+        />
+        <button
+          type="submit"
+          disabled={checking || normalizeTrackingCode(code).length === 0}
+          className="cursor-pointer rounded-xl bg-[var(--lagoon)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+        >
+          {checking ? '…' : 'Voir'}
+        </button>
+      </form>
+
+      {error && (
+        <p className="m-0 mt-3 text-sm text-[var(--status-warn)]">{error}</p>
+      )}
+    </div>
   )
 }
 

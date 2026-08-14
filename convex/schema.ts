@@ -86,6 +86,18 @@ export default defineSchema({
     count: v.number(),
   }).index('by_client', ['clientSlug']),
 
+  // Codes d'accès client : un code actif par campagne, saisi sur la page de
+  // connexion pour ouvrir le suivi public de la campagne (lecture seule).
+  accessCodes: defineTable({
+    code: v.string(),
+    // metaId de la campagne suivie
+    campaignId: v.string(),
+    createdAt: v.string(),
+    revokedAt: v.optional(v.string()),
+  })
+    .index('by_code', ['code'])
+    .index('by_campaign', ['campaignId']),
+
   prospects: defineTable({
     clientSlug: v.string(),
     // Campagne Meta à laquelle le prospect est rattaché (CRM par campagne)

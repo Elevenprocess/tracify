@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SuiviRouteImport } from './routes/suivi'
 import { Route as CampagnesCampaignIdRouteImport } from './routes/campagnes.$campaignId'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
@@ -37,6 +38,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuiviRoute = SuiviRouteImport.update({
+  id: '/suivi',
+  path: '/suivi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CampagnesCampaignIdRoute = CampagnesCampaignIdRouteImport.update({
   id: '/campagnes/$campaignId',
   path: '/campagnes/$campaignId',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/suivi': typeof SuiviRoute
   '/campagnes/$campaignId': typeof CampagnesCampaignIdRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/suivi': typeof SuiviRoute
   '/campagnes/$campaignId': typeof CampagnesCampaignIdRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/suivi': typeof SuiviRoute
   '/campagnes/$campaignId': typeof CampagnesCampaignIdRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/demo/drizzle': typeof DemoDrizzleRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/dashboard'
     | '/login'
+    | '/suivi'
     | '/campagnes/$campaignId'
     | '/clients/$clientId'
     | '/demo/drizzle'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/dashboard'
     | '/login'
+    | '/suivi'
     | '/campagnes/$campaignId'
     | '/clients/$clientId'
     | '/demo/drizzle'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/dashboard'
     | '/login'
+    | '/suivi'
     | '/campagnes/$campaignId'
     | '/clients/$clientId'
     | '/demo/drizzle'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  SuiviRoute: typeof SuiviRoute
   CampagnesCampaignIdRoute: typeof CampagnesCampaignIdRoute
   ClientsClientIdRoute: typeof ClientsClientIdRoute
   DemoDrizzleRoute: typeof DemoDrizzleRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/suivi': {
+      id: '/suivi'
+      path: '/suivi'
+      fullPath: '/suivi'
+      preLoaderRoute: typeof SuiviRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/campagnes/$campaignId': {
       id: '/campagnes/$campaignId'
       path: '/campagnes/$campaignId'
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  SuiviRoute: SuiviRoute,
   CampagnesCampaignIdRoute: CampagnesCampaignIdRoute,
   ClientsClientIdRoute: ClientsClientIdRoute,
   DemoDrizzleRoute: DemoDrizzleRoute,

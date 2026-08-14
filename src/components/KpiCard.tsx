@@ -7,6 +7,8 @@ interface KpiCardProps {
   delta?: number
   deltaLabel?: string
   deltaGoodWhenDown?: boolean
+  // Version resserrée pour la vue de suivi client
+  compact?: boolean
 }
 
 export default function KpiCard({
@@ -16,17 +18,22 @@ export default function KpiCard({
   delta,
   deltaLabel,
   deltaGoodWhenDown = false,
+  compact = false,
 }: KpiCardProps) {
   const isGood =
     delta !== undefined && (deltaGoodWhenDown ? delta <= 0 : delta >= 0)
 
   return (
-    <article className="island-shell rounded-2xl p-5">
-      <p className="island-kicker m-0 mb-3 flex items-center gap-2">
+    <article className={`island-shell rounded-2xl ${compact ? 'p-4' : 'p-5'}`}>
+      <p
+        className={`island-kicker m-0 flex items-center gap-2 ${compact ? 'mb-1.5' : 'mb-3'}`}
+      >
         {icon}
         {label}
       </p>
-      <p className="m-0 text-3xl font-bold tracking-tight text-[var(--sea-ink)]">
+      <p
+        className={`m-0 font-bold tracking-tight text-[var(--sea-ink)] ${compact ? 'text-xl' : 'text-3xl'}`}
+      >
         {value}
       </p>
       {delta !== undefined && (

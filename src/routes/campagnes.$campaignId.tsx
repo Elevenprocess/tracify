@@ -1,34 +1,16 @@
+import { useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import AppShell from '../components/AppShell'
-import KpiCard from '../components/KpiCard'
+import CampaignOverview, { STATUS_LABELS } from '../components/CampaignOverview'
 import ProspectsBoard from '../components/ProspectsBoard'
-import LineChart from '../components/charts/LineChart'
-import {
-  ArrowLeftIcon,
-  MegaphoneIcon,
-  TargetIcon,
-  TrendIcon,
-  UsersIcon,
-  WalletIcon,
-} from '../components/icons'
-import {
-  formatDay,
-  formatEuro,
-  formatNumber,
-  formatPercent,
-} from '../lib/format'
+import { ArrowLeftIcon, UsersIcon } from '../components/icons'
 import RequireAuth from '../components/RequireAuth'
 
 export const Route = createFileRoute('/campagnes/$campaignId')({
   component: CampaignPage,
 })
-
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: 'Active', color: 'var(--status-good)' },
-  PAUSED: { label: 'En pause', color: 'var(--status-warn)' },
-}
 
 function CampaignPage() {
   return (
@@ -62,14 +44,6 @@ function CampaignDetail() {
   }
 
   const status = data.status ? STATUS_LABELS[data.status] : undefined
-  const spendSeries = data.daily.map((d) => ({
-    label: formatDay(d.date),
-    value: d.spend,
-  }))
-  const leadSeries = data.daily.map((d) => ({
-    label: formatDay(d.date),
-    value: d.leads,
-  }))
 
   return (
     <main className="min-w-0">
@@ -121,134 +95,95 @@ function CampaignDetail() {
         )}
       </header>
 
-      <section
-        aria-label="Indicateurs clés"
-        className="rise-in grid gap-4 sm:grid-cols-3"
-      >
-        <KpiCard
-          label="Dépense publicitaire"
-          value={formatEuro(data.totals.spend)}
-          icon={<WalletIcon />}
-        />
-        <KpiCard
-          label="Prospects générés"
-          value={formatNumber(data.totals.leads)}
-          icon={<UsersIcon />}
-        />
-        <KpiCard
-          label="Coût par prospect"
-          value={data.totals.cpl !== null ? formatEuro(data.totals.cpl) : '—'}
-          icon={<TargetIcon />}
-        />
-        <KpiCard
-          label="Impressions"
-          value={formatNumber(data.totals.impressions)}
-          icon={<TrendIcon />}
-        />
-        <KpiCard
-          label="Clics"
-          value={formatNumber(data.totals.clicks)}
-          icon={<TrendIcon />}
-        />
-        <KpiCard
-          label="CTR · CPC"
-          value={`${data.totals.ctr !== null ? formatPercent(data.totals.ctr) : '—'} · ${data.totals.cpc !== null ? formatEuro(data.totals.cpc) : '—'}`}
-          icon={<TrendIcon />}
-        />
-      </section>
+      <CampaignOverview data={data} />
 
-      {data.daily.length > 1 && (
-        <section className="mt-6 grid gap-4 lg:grid-cols-2">
-          <article className="island-shell rise-in rounded-2xl p-5">
-            <h2 className="demo-section-title mb-4">Dépense quotidienne</h2>
-            <LineChart data={spendSeries} formatValue={formatEuro} />
-          </article>
-          <article className="island-shell rise-in rounded-2xl p-5">
-            <h2 className="demo-section-title mb-4">Prospects par jour</h2>
-            <LineChart
-              data={leadSeries}
-              color="var(--chart-2)"
-              formatValue={formatNumber}
-            />
-          </article>
-        </section>
-      )}
-
-      <section className="mt-6">
-        <h2 className="demo-section-title mb-3 flex items-center gap-2">
-          <MegaphoneIcon className="h-4 w-4 text-[var(--lagoon)]" />
-          Créatives
-        </h2>
-        <div className="demo-table-shell island-shell rounded-2xl">
-          <table className="demo-table min-w-[860px] text-sm">
-            <thead>
-              <tr>
-                <th>Créative</th>
-                <th>Dépense</th>
-                <th>Impressions</th>
-                <th>Clics</th>
-                <th>CTR</th>
-                <th>CPC</th>
-                <th>Prospects</th>
-                <th>Coût / prospect</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.creatives.map((c) => {
-                const adStatus = c.status ? STATUS_LABELS[c.status] : undefined
-                return (
-                  <tr key={c.adId}>
-                    <td>
-                      <div className="flex items-center gap-3">
-                        {c.thumbnailUrl ? (
-                          <img
-                            src={c.thumbnailUrl}
-                            alt=""
-                            loading="lazy"
-                            className="h-10 w-10 flex-shrink-0 rounded-lg border border-[var(--line)] object-cover"
-                          />
-                        ) : (
-                          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[var(--line)] text-[var(--sea-ink-soft)]">
-                            <MegaphoneIcon className="h-4 w-4" />
-                          </span>
-                        )}
-                        <div className="min-w-0">
-                          <p className="m-0 max-w-72 truncate font-semibold text-[var(--sea-ink)]">
-                            {c.name}
-                          </p>
-                          <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
-                            {adStatus?.label ?? c.status ?? '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{formatEuro(c.spend)}</td>
-                    <td>{formatNumber(c.impressions)}</td>
-                    <td>{formatNumber(c.clicks)}</td>
-                    <td>{c.ctr !== null ? formatPercent(c.ctr) : '—'}</td>
-                    <td>{c.cpc !== null ? formatEuro(c.cpc) : '—'}</td>
-                    <td>{formatNumber(c.leads)}</td>
-                    <td>{c.cpl !== null ? formatEuro(c.cpl) : '—'}</td>
-                  </tr>
-                )
-              })}
-              {data.creatives.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="text-center text-[var(--sea-ink-soft)]"
-                  >
-                    Aucune créative synchronisée pour l'instant — la prochaine
-                    sync les fera apparaître.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <AccessSection metaId={data.metaId} />
 
       <ProspectsBoard campaignId={data.metaId} />
     </main>
+  )
+}
+
+// Code d'accès client : généré ici, saisi par le client sur la page de
+// connexion pour ouvrir le suivi public de cette campagne.
+function AccessSection({ metaId }: { metaId: string }) {
+  const current = useQuery(api.access.codeForCampaign, { metaId })
+  const generate = useMutation(api.access.generate)
+  const revoke = useMutation(api.access.revoke)
+  const [pending, setPending] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setPending(true)
+    try {
+      await fn()
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const onCopy = async () => {
+    if (!current) return
+    await navigator.clipboard.writeText(current.code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <section className="mt-6">
+      <h2 className="demo-section-title mb-3 flex items-center gap-2">
+        <UsersIcon className="h-4 w-4 text-[var(--lagoon)]" />
+        Accès client
+      </h2>
+      <article className="island-shell rise-in rounded-2xl p-5">
+        <p className="m-0 text-sm text-[var(--sea-ink-soft)]">
+          Transmets ce code au client : saisi sur la page de connexion, il ouvre
+          le suivi de cette campagne en lecture seule. Régénérer ou désactiver
+          le code coupe l'accès immédiatement.
+        </p>
+
+        {current === undefined ? (
+          <p className="demo-muted m-0 mt-4 text-sm">Chargement…</p>
+        ) : current === null ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => generate({ metaId }))}
+            className="mt-4 cursor-pointer rounded-xl bg-[var(--lagoon)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+          >
+            Générer un code
+          </button>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2 font-mono text-xl font-bold tracking-[0.3em] text-[var(--sea-ink)]">
+              {current.code}
+            </span>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold text-[var(--sea-ink)]"
+            >
+              {copied ? 'Copié !' : 'Copier'}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => run(() => generate({ metaId }))}
+              className="cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold text-[var(--sea-ink)] disabled:opacity-60"
+            >
+              Régénérer
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => run(() => revoke({ metaId }))}
+              className="cursor-pointer rounded-xl border border-transparent px-3 py-2 text-sm font-semibold text-[var(--status-warn)] disabled:opacity-60"
+            >
+              Désactiver
+            </button>
+          </div>
+        )}
+      </article>
+    </section>
   )
 }
