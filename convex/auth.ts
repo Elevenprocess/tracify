@@ -5,7 +5,11 @@ import { convexAuth } from '@convex-dev/auth/server'
 const ALLOWED_EMAILS = ['contact@elevenprocess.com', 'mario@elevenprocess.com']
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Google],
+  providers: [
+    // select_account : après un refus, l'utilisateur peut choisir un autre
+    // compte Google au lieu d'être renvoyé sur le même automatiquement.
+    Google({ authorization: { params: { prompt: 'select_account' } } }),
+  ],
   callbacks: {
     async createOrUpdateUser(ctx, args) {
       const email = args.profile.email?.toLowerCase()

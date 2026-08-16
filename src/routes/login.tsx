@@ -5,15 +5,18 @@ import { useConvex, useConvexAuth } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../convex/_generated/api'
 import { TRACKING_CODE_KEY, normalizeTrackingCode } from '../lib/trackingCode'
-import { EyeIcon, KeyIcon } from '../components/icons'
+import { AlertIcon, EyeIcon, KeyIcon } from '../components/icons'
 
 export const Route = createFileRoute('/login')({
+  validateSearch: (search: Record<string, unknown>): { from?: string } =>
+    typeof search.from === 'string' ? { from: search.from } : {},
   component: LoginPage,
 })
 
 function LoginPage() {
-  const { isAuthenticated } = useConvexAuth()
+  const { isAuthenticated, isLoading } = useConvexAuth()
   const { signIn } = useAuthActions()
+  const { from } = Route.useSearch()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -21,11 +24,16 @@ function LoginPage() {
     return <Navigate to="/dashboard" />
   }
 
+  // Retour de Google : le callback renvoie ici avec `?code=` en cas de succès
+  // (échangé pendant isLoading) et sans code si le compte a été refusé par
+  // la liste blanche → on l'explique au lieu d'un retour silencieux.
+  const refused = from === 'google' && !isLoading && !isAuthenticated
+
   const onGoogle = async () => {
     setPending(true)
     setError(null)
     try {
-      await signIn('google', { redirectTo: '/dashboard' })
+      await signIn('google', { redirectTo: '/login?from=google' })
     } catch {
       setError('Connexion impossible. Réessaie ou contacte Mario.')
       setPending(false)
@@ -45,6 +53,25 @@ function LoginPage() {
           Le suivi des campagnes publicitaires d'Eleven Process.
         </p>
       </div>
+
+      {refused && (
+        <div
+          role="alert"
+          className="rise-in mb-5 flex w-full max-w-3xl items-start gap-3 rounded-2xl border border-[rgba(217,160,74,0.35)] bg-[rgba(217,160,74,0.08)] px-4 py-3.5"
+        >
+          <AlertIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--status-warn)]" />
+          <div className="min-w-0 text-sm">
+            <p className="m-0 font-bold text-[var(--sea-ink)]">
+              Vous n'êtes pas membre d'Eleven Process
+            </p>
+            <p className="m-0 mt-0.5 leading-relaxed text-[var(--sea-ink-soft)]">
+              Ce compte Google n'a pas accès au tableau de bord. Réessayez avec
+              un compte @elevenprocess.com autorisé, ou, si vous êtes client,
+              utilisez le code de suivi qui vous a été transmis.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="rise-in grid w-full max-w-3xl gap-4 md:grid-cols-2">
         <section className="island-shell flex flex-col rounded-2xl p-6 sm:p-7">
@@ -66,7 +93,11 @@ function LoginPage() {
             className="mt-auto flex w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-transparent bg-white px-4 py-2.5 pt-2.5 text-sm font-bold text-black transition-colors hover:bg-[#eef3f3] disabled:opacity-60 [margin-top:1.5rem]"
           >
             <GoogleIcon />
-            {pending ? 'Redirection…' : 'Se connecter avec Google'}
+            {pending
+              ? 'Redirection…'
+              : refused
+                ? 'Essayer un autre compte Google'
+                : 'Se connecter avec Google'}
           </button>
 
           {error && (
