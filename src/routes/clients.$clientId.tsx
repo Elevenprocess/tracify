@@ -17,6 +17,7 @@ import {
 import { formatDayRange, formatEuro, formatNumber } from '../lib/format'
 import RequireAuth from '../components/RequireAuth'
 import AccessSection from '../components/AccessSection'
+import { ClientProspectsBoard } from '../components/ProspectsBoard'
 
 export const Route = createFileRoute('/clients/$clientId')({
   component: ClientDetailPage,
@@ -150,6 +151,8 @@ function ClientDetail() {
           )}
         </article>
       </section>
+
+      <ClientProspectsBoard clientSlug={client.slug} />
 
       <AccessSection clientSlug={client.slug} />
     </main>

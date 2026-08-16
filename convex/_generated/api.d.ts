@@ -15,6 +15,7 @@ import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as guard from "../guard.js";
 import type * as http from "../http.js";
+import type * as leads from "../leads.js";
 import type * as meta from "../meta.js";
 import type * as prospects from "../prospects.js";
 import type * as seed from "../seed.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   dashboard: typeof dashboard;
   guard: typeof guard;
   http: typeof http;
+  leads: typeof leads;
   meta: typeof meta;
   prospects: typeof prospects;
   seed: typeof seed;

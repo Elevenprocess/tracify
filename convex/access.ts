@@ -9,6 +9,7 @@ import { mutation, query } from './_generated/server'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import { requireUser } from './guard'
 import { buildCampaignDetail } from './meta'
+import { STATUS, toCard } from './prospects'
 
 // Alphabet sans caractères ambigus (pas de O/0, I/L/1) : facile à dicter.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -93,7 +94,7 @@ export const revoke = mutation({
 
 // --- Accès public par code (aucune session requise) -------------------------
 
-async function clientSlugForCode(ctx: QueryCtx, raw: string) {
+async function clientSlugForCode(ctx: QueryCtx | MutationCtx, raw: string) {
   const code = normalizeCode(raw)
   if (!code) return null
   const doc = await ctx.db
@@ -139,5 +140,32 @@ export const trackingView = query({
       client: { slug: client.slug, name: client.name },
       campaigns: details,
     }
+  },
+})
+
+// Pipeline du client : ses prospects (toutes campagnes confondues), en
+// lecture + changement de statut, protégé uniquement par le code.
+export const trackingProspects = query({
+  args: { code: v.string() },
+  handler: async (ctx, { code }) => {
+    const clientSlug = await clientSlugForCode(ctx, code)
+    if (!clientSlug) return null
+    const rows = await ctx.db
+      .query('prospects')
+      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+      .collect()
+    return rows.sort((a, b) => b.date.localeCompare(a.date)).map(toCard)
+  },
+})
+
+export const trackingSetStatus = mutation({
+  args: { code: v.string(), id: v.id('prospects'), status: STATUS },
+  handler: async (ctx, { code, id, status }) => {
+    const clientSlug = await clientSlugForCode(ctx, code)
+    if (!clientSlug) throw new Error('Code invalide.')
+    const prospect = await ctx.db.get(id)
+    if (!prospect || prospect.clientSlug !== clientSlug)
+      throw new Error('Prospect introuvable.')
+    await ctx.db.patch(id, { status })
   },
 })

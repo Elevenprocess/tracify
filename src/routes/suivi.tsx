@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import CampaignOverview, { STATUS_LABELS } from '../components/CampaignOverview'
+import { PipelineBoard } from '../components/ProspectsBoard'
 import { TRACKING_CODE_KEY } from '../lib/trackingCode'
 
 export const Route = createFileRoute('/suivi')({
@@ -27,6 +28,11 @@ function SuiviPage() {
   }, [code, navigate])
 
   const data = useQuery(api.access.trackingView, code ? { code } : 'skip')
+  const prospects = useQuery(
+    api.access.trackingProspects,
+    code ? { code } : 'skip',
+  )
+  const setProspectStatus = useMutation(api.access.trackingSetStatus)
 
   const quit = () => {
     localStorage.removeItem(TRACKING_CODE_KEY)
@@ -141,6 +147,15 @@ function SuiviPage() {
           Aucune campagne rattachée pour l'instant — revenez bientôt.
         </p>
       )}
+
+      <PipelineBoard
+        title="Vos prospects"
+        prospects={prospects ?? []}
+        onSetStatus={(id, next) => {
+          if (code) setProspectStatus({ code, id, status: next })
+        }}
+        emptyHint="Aucun prospect pour l'instant"
+      />
     </main>
   )
 }

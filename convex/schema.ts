@@ -24,8 +24,12 @@ export default defineSchema({
       v.literal('ended'),
     ),
     activeCampaigns: v.optional(v.number()),
+    // Clé secrète du webhook d'entrée des leads (POST /api/leads).
+    webhookKey: v.optional(v.string()),
     createdAt: v.string(),
-  }).index('by_slug', ['slug']),
+  })
+    .index('by_slug', ['slug'])
+    .index('by_webhook', ['webhookKey']),
 
   // Campagnes Meta rattachées à un client — un simple ID de campagne suffit,
   // la sync récupère le nom, le statut et les stats depuis la Graph API.
@@ -103,6 +107,7 @@ export default defineSchema({
     campaignId: v.optional(v.string()),
     name: v.string(),
     phone: v.string(),
+    email: v.optional(v.string()),
     date: v.string(),
     source: v.string(),
     medium: v.string(),

@@ -3,17 +3,18 @@ import { v } from 'convex/values'
 import { requireUser } from './guard'
 import type { Doc } from './_generated/dataModel'
 
-const STATUS = v.union(
+export const STATUS = v.union(
   v.literal('new'),
   v.literal('contacted'),
   v.literal('qualified'),
   v.literal('lost'),
 )
 
-const toCard = (p: Doc<'prospects'>) => ({
+export const toCard = (p: Doc<'prospects'>) => ({
   id: p._id,
   name: p.name,
   phone: p.phone,
+  email: p.email,
   date: p.date,
   source: p.source,
   medium: p.medium,

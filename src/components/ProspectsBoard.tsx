@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DragEvent, FormEvent } from 'react'
+import type { DragEvent, FormEvent, ReactNode } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
@@ -7,10 +7,11 @@ import type { ProspectStatus } from '../lib/format'
 import { formatDay } from '../lib/format'
 import { PlusIcon, TrashIcon, UsersIcon } from './icons'
 
-interface Prospect {
+export interface Prospect {
   id: Id<'prospects'>
   name: string
   phone: string
+  email?: string
   date: string
   source: string
   medium: string
@@ -28,6 +29,7 @@ const COLUMNS: Array<{
   { status: 'lost', label: 'Perdu', color: 'var(--status-muted)' },
 ]
 
+// Kanban admin d'une campagne : lecture, statut, suppression, ajout manuel.
 export default function ProspectsBoard({
   campaignId,
   initial,
@@ -36,17 +38,58 @@ export default function ProspectsBoard({
   initial?: Array<Prospect>
 }) {
   const live = useQuery(api.prospects.byCampaign, { campaignId })
-  const prospects = live ?? initial ?? []
   const setStatus = useMutation(api.prospects.setStatus)
   const removeProspect = useMutation(api.prospects.remove)
+  return (
+    <PipelineBoard
+      prospects={live ?? initial ?? []}
+      onSetStatus={(id, status) => setStatus({ id, status })}
+      onRemove={(id) => removeProspect({ id })}
+      action={<AddProspectForm campaignId={campaignId} />}
+    />
+  )
+}
 
+// Kanban admin de tous les prospects d'un client (toutes campagnes, y compris
+// ceux arrivés par le webhook sans campagne).
+export function ClientProspectsBoard({ clientSlug }: { clientSlug: string }) {
+  const live = useQuery(api.prospects.byClient, { clientSlug })
+  const setStatus = useMutation(api.prospects.setStatus)
+  const removeProspect = useMutation(api.prospects.remove)
+  return (
+    <PipelineBoard
+      title="Pipeline prospects"
+      prospects={live ?? []}
+      onSetStatus={(id, status) => setStatus({ id, status })}
+      onRemove={(id) => removeProspect({ id })}
+    />
+  )
+}
+
+// Kanban générique : la source des données et les actions sont injectées,
+// ce qui permet de le réutiliser dans l'espace client (accès par code).
+export function PipelineBoard({
+  prospects,
+  onSetStatus,
+  onRemove,
+  action,
+  title = 'CRM prospects',
+  emptyHint = 'Glisse un prospect ici',
+}: {
+  prospects: Array<Prospect>
+  onSetStatus: (id: Id<'prospects'>, status: ProspectStatus) => void
+  onRemove?: (id: Id<'prospects'>) => void
+  action?: ReactNode
+  title?: string
+  emptyHint?: string
+}) {
   const [dragOver, setDragOver] = useState<ProspectStatus | null>(null)
 
   const onDrop = (e: DragEvent, status: ProspectStatus) => {
     e.preventDefault()
     setDragOver(null)
     const id = e.dataTransfer.getData('text/prospect-id')
-    if (id) setStatus({ id: id as Id<'prospects'>, status })
+    if (id) onSetStatus(id as Id<'prospects'>, status)
   }
 
   return (
@@ -54,9 +97,12 @@ export default function ProspectsBoard({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="demo-section-title m-0 flex items-center gap-2">
           <UsersIcon className="h-4 w-4 text-[var(--lagoon)]" />
-          CRM prospects
+          {title}
+          <span className="font-normal text-[var(--sea-ink-soft)]">
+            {prospects.length}
+          </span>
         </h2>
-        <AddProspectForm campaignId={campaignId} />
+        {action}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -103,21 +149,38 @@ export default function ProspectsBoard({
                       <p className="m-0 text-sm font-semibold text-[var(--sea-ink)]">
                         {p.name}
                       </p>
-                      <button
-                        type="button"
-                        aria-label={`Supprimer ${p.name}`}
-                        onClick={() => {
-                          if (window.confirm(`Supprimer « ${p.name} » ?`))
-                            removeProspect({ id: p.id })
-                        }}
-                        className="cursor-pointer rounded border-0 bg-transparent p-0.5 text-[var(--sea-ink-soft)] opacity-0 transition-opacity hover:text-[var(--status-warn)] group-hover:opacity-100"
-                      >
-                        <TrashIcon className="h-3.5 w-3.5" />
-                      </button>
+                      {onRemove && (
+                        <button
+                          type="button"
+                          aria-label={`Supprimer ${p.name}`}
+                          onClick={() => {
+                            if (window.confirm(`Supprimer « ${p.name} » ?`))
+                              onRemove(p.id)
+                          }}
+                          className="cursor-pointer rounded border-0 bg-transparent p-0.5 text-[var(--sea-ink-soft)] opacity-0 transition-opacity hover:text-[var(--status-warn)] group-hover:opacity-100"
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                     {p.phone && (
                       <p className="m-0 mt-0.5 text-xs text-[var(--sea-ink-soft)]">
-                        {p.phone}
+                        <a
+                          href={`tel:${p.phone.replace(/\s/g, '')}`}
+                          className="text-inherit no-underline hover:underline"
+                        >
+                          {p.phone}
+                        </a>
+                      </p>
+                    )}
+                    {p.email && (
+                      <p className="m-0 mt-0.5 truncate text-xs text-[var(--sea-ink-soft)]">
+                        <a
+                          href={`mailto:${p.email}`}
+                          className="text-inherit no-underline hover:underline"
+                        >
+                          {p.email}
+                        </a>
                       </p>
                     )}
                     <p className="m-0 mt-1 text-xs text-[var(--sea-ink-soft)]">
@@ -126,10 +189,7 @@ export default function ProspectsBoard({
                     <select
                       value={p.status}
                       onChange={(e) =>
-                        setStatus({
-                          id: p.id,
-                          status: e.target.value as ProspectStatus,
-                        })
+                        onSetStatus(p.id, e.target.value as ProspectStatus)
                       }
                       aria-label={`Statut de ${p.name}`}
                       className="mt-2 w-full cursor-pointer rounded-lg border border-[var(--line)] bg-transparent px-2 py-1 text-xs text-[var(--sea-ink-soft)] outline-none focus:border-[var(--lagoon)] sm:hidden"
@@ -148,7 +208,7 @@ export default function ProspectsBoard({
                 ))}
                 {cards.length === 0 && (
                   <p className="m-0 rounded-xl border border-dashed border-[var(--line)] px-3 py-4 text-center text-xs text-[var(--sea-ink-soft)]">
-                    Glisse un prospect ici
+                    {emptyHint}
                   </p>
                 )}
               </div>
