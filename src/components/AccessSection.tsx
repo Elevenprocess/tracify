@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
-import { UsersIcon } from './icons'
+import { CheckIcon, CopyIcon, KeyIcon, WebhookIcon } from './icons'
+import { SectionTitle } from './ui'
 
 // URL du webhook : le site Convex (.convex.site) dérivé de l'URL du déploiement.
 const WEBHOOK_URL = `${(
@@ -38,62 +39,77 @@ export default function AccessSection({ clientSlug }: { clientSlug: string }) {
   }
 
   return (
-    <section className="mt-6">
-      <h2 className="demo-section-title mb-3 flex items-center gap-2">
-        <UsersIcon className="h-4 w-4 text-[var(--lagoon)]" />
+    <section className="mt-8">
+      <SectionTitle icon={<KeyIcon className="h-4 w-4" />}>
         Accès client
-      </h2>
-      <article className="island-shell rise-in rounded-2xl p-5">
-        <p className="m-0 text-sm text-[var(--sea-ink-soft)]">
-          Transmets ce code au client : saisi sur la page de connexion, il ouvre
-          le suivi de ses campagnes en lecture seule. Régénérer ou désactiver le
-          code coupe l'accès immédiatement.
-        </p>
+      </SectionTitle>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <article className="island-shell rise-in flex flex-col rounded-2xl p-5">
+          <h3 className="m-0 text-sm font-bold text-[var(--sea-ink)]">
+            Code de suivi
+          </h3>
+          <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+            Transmets ce code au client : saisi sur la page de connexion, il
+            ouvre son espace de suivi (campagnes + prospects). Régénérer ou
+            désactiver le code coupe l'accès immédiatement.
+          </p>
 
-        {current === undefined ? (
-          <p className="demo-muted m-0 mt-4 text-sm">Chargement…</p>
-        ) : current === null ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => run(() => generate({ clientSlug }))}
-            className="mt-4 cursor-pointer rounded-xl bg-[var(--lagoon)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-          >
-            Générer un code
-          </button>
-        ) : (
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2 font-mono text-xl font-bold tracking-[0.3em] text-[var(--sea-ink)]">
-              {current.code}
-            </span>
-            <button
-              type="button"
-              onClick={onCopy}
-              className="cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold text-[var(--sea-ink)]"
-            >
-              {copied ? 'Copié !' : 'Copier'}
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => run(() => generate({ clientSlug }))}
-              className="cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold text-[var(--sea-ink)] disabled:opacity-60"
-            >
-              Régénérer
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => run(() => revoke({ clientSlug }))}
-              className="cursor-pointer rounded-xl border border-transparent px-3 py-2 text-sm font-semibold text-[var(--status-warn)] disabled:opacity-60"
-            >
-              Désactiver
-            </button>
-          </div>
-        )}
-      </article>
+          {current === undefined ? (
+            <div className="skeleton mt-4 h-12 w-40" />
+          ) : current === null ? (
+            <div className="mt-4">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run(() => generate({ clientSlug }))}
+                className="btn btn-primary"
+              >
+                Générer un code
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="tabular rounded-xl border border-[var(--lagoon-line)] bg-[var(--lagoon-tint)] px-4 py-2 font-mono text-xl font-extrabold tracking-[0.3em] text-[var(--sea-ink)]">
+                  {current.code}
+                </span>
+                <button
+                  type="button"
+                  onClick={onCopy}
+                  className="btn btn-secondary btn-sm"
+                >
+                  {copied ? (
+                    <CheckIcon className="h-3.5 w-3.5 text-[var(--status-good)]" />
+                  ) : (
+                    <CopyIcon className="h-3.5 w-3.5" />
+                  )}
+                  {copied ? 'Copié' : 'Copier'}
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => run(() => generate({ clientSlug }))}
+                  className="btn btn-ghost btn-sm"
+                >
+                  Régénérer
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => run(() => revoke({ clientSlug }))}
+                  className="btn btn-danger btn-sm"
+                >
+                  Désactiver
+                </button>
+              </div>
+            </div>
+          )}
+        </article>
 
-      <WebhookCard clientSlug={clientSlug} />
+        <WebhookCard clientSlug={clientSlug} />
+      </div>
     </section>
   )
 }
@@ -137,11 +153,12 @@ function WebhookCard({ clientSlug }: { clientSlug: string }) {
     : ''
 
   return (
-    <article className="island-shell rise-in mt-4 rounded-2xl p-5">
-      <h3 className="m-0 text-sm font-bold text-[var(--sea-ink)]">
+    <article className="island-shell rise-in flex flex-col rounded-2xl p-5">
+      <h3 className="m-0 flex items-center gap-2 text-sm font-bold text-[var(--sea-ink)]">
+        <WebhookIcon className="h-4 w-4 text-[var(--lagoon)]" />
         Réception des leads (webhook)
       </h3>
-      <p className="m-0 mt-1 text-sm text-[var(--sea-ink-soft)]">
+      <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
         Envoie les prospects de ce client en <code>POST</code> JSON sur cette
         adresse (depuis n8n, GHL, Zapier…) : ils apparaissent dans son pipeline
         ici et dans son espace client. Les doublons (même téléphone ou email)
@@ -149,16 +166,18 @@ function WebhookCard({ clientSlug }: { clientSlug: string }) {
       </p>
 
       {key === undefined ? (
-        <p className="demo-muted m-0 mt-4 text-sm">Chargement…</p>
+        <div className="skeleton mt-4 h-9 w-full" />
       ) : key === null ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run(() => generate({ clientSlug }))}
-          className="mt-4 cursor-pointer rounded-xl bg-[var(--lagoon)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-        >
-          Activer le webhook
-        </button>
+        <div className="mt-auto pt-4">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => generate({ clientSlug }))}
+            className="btn btn-primary"
+          >
+            Activer le webhook
+          </button>
+        </div>
       ) : (
         <div className="mt-4 space-y-3">
           <Row
@@ -179,15 +198,20 @@ function WebhookCard({ clientSlug }: { clientSlug: string }) {
               <button
                 type="button"
                 onClick={() => copy('body', example)}
-                className="cursor-pointer rounded-lg border border-[var(--line)] bg-transparent px-2 py-1 text-xs font-semibold text-[var(--sea-ink)]"
+                className="btn btn-ghost btn-sm"
               >
-                {copied === 'body' ? 'Copié !' : 'Copier'}
+                {copied === 'body' ? (
+                  <CheckIcon className="h-3 w-3 text-[var(--status-good)]" />
+                ) : (
+                  <CopyIcon className="h-3 w-3" />
+                )}
+                {copied === 'body' ? 'Copié' : 'Copier'}
               </button>
             </div>
-            <pre className="m-0 overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--sea-ink)]">
+            <pre className="m-0 overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] p-3 text-[11px] leading-relaxed text-[var(--sea-ink)]">
               {example}
             </pre>
-            <p className="m-0 mt-1 text-xs text-[var(--sea-ink-soft)]">
+            <p className="m-0 mt-1.5 text-[11px] leading-relaxed text-[var(--sea-ink-faint)]">
               Champs acceptés : name (ou first_name + last_name), phone, email,
               source, medium, campaignId, date. La clé peut aussi passer en
               en-tête <code>Authorization: Bearer …</code>.
@@ -205,7 +229,7 @@ function WebhookCard({ clientSlug }: { clientSlug: string }) {
                 )
                   run(() => generate({ clientSlug }))
               }}
-              className="cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold text-[var(--sea-ink)] disabled:opacity-60"
+              className="btn btn-ghost btn-sm"
             >
               Régénérer la clé
             </button>
@@ -213,7 +237,7 @@ function WebhookCard({ clientSlug }: { clientSlug: string }) {
               type="button"
               disabled={pending}
               onClick={() => run(() => revoke({ clientSlug }))}
-              className="cursor-pointer rounded-xl border border-transparent px-3 py-2 text-sm font-semibold text-[var(--status-warn)] disabled:opacity-60"
+              className="btn btn-danger btn-sm"
             >
               Désactiver
             </button>
@@ -236,17 +260,22 @@ function Row({
   onCopy: () => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="island-kicker w-10">{label}</span>
-      <code className="min-w-0 flex-1 truncate rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--sea-ink)]">
+    <div className="flex items-center gap-2">
+      <span className="island-kicker w-9 flex-shrink-0">{label}</span>
+      <code className="min-w-0 flex-1 truncate rounded-lg border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-1.5 text-[11px] text-[var(--sea-ink)]">
         {value}
       </code>
       <button
         type="button"
         onClick={onCopy}
-        className="cursor-pointer rounded-lg border border-[var(--line)] bg-transparent px-2 py-1 text-xs font-semibold text-[var(--sea-ink)]"
+        aria-label={`Copier ${label}`}
+        className="btn btn-ghost btn-sm flex-shrink-0 px-2"
       >
-        {copied ? 'Copié !' : 'Copier'}
+        {copied ? (
+          <CheckIcon className="h-3.5 w-3.5 text-[var(--status-good)]" />
+        ) : (
+          <CopyIcon className="h-3.5 w-3.5" />
+        )}
       </button>
     </div>
   )

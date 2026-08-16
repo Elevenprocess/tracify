@@ -9,7 +9,10 @@ export default function Header() {
             to="/"
             className="inline-flex items-center gap-2 text-base font-bold tracking-tight text-[var(--sea-ink)] no-underline"
           >
-            <span className="h-2.5 w-2.5 rounded-full bg-[var(--lagoon)]" />
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inset-0 rounded-full bg-[var(--lagoon)] opacity-60 blur-[3px]" />
+              <span className="relative h-2.5 w-2.5 rounded-full bg-[var(--lagoon)]" />
+            </span>
             Tracify
           </Link>
         </h2>

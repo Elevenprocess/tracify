@@ -6,24 +6,31 @@
   --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Thème unique sombre, aligné sur la landing : couleurs plates, sans dégradés. */
+/* Thème unique sombre, aligné sur la landing : couleurs plates, sans dégradés
+   criards — juste une lueur d'ambiance et des surfaces translucides. */
 :root {
   color-scheme: dark;
 
-  --bg-base: #050508;
+  --bg-base: #06090c;
   --sea-ink: #f2f5f5;
-  --sea-ink-soft: rgba(242, 245, 245, 0.55);
+  --sea-ink-soft: rgba(242, 245, 245, 0.6);
+  --sea-ink-faint: rgba(242, 245, 245, 0.38);
   --lagoon: #60d7cf;
   --lagoon-deep: #60d7cf;
-  --surface: rgba(255, 255, 255, 0.03);
-  --surface-strong: rgba(255, 255, 255, 0.05);
-  --surface-solid: #0d1114;
-  --line: rgba(255, 255, 255, 0.1);
+  --lagoon-ink: #04201e; /* texte sur fond lagon */
+  --lagoon-tint: rgba(96, 215, 207, 0.12);
+  --lagoon-line: rgba(96, 215, 207, 0.35);
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-strong: rgba(255, 255, 255, 0.06);
+  --surface-solid: #0e1317;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
   --kicker: #60d7cf;
-  --header-bg: rgba(5, 5, 8, 0.8);
+  --header-bg: rgba(6, 9, 12, 0.82);
   --chip-bg: rgba(255, 255, 255, 0.04);
   --chip-line: rgba(255, 255, 255, 0.12);
   --link-bg-hover: rgba(255, 255, 255, 0.08);
+  --ring: rgba(96, 215, 207, 0.55);
 
   --chart-1: #149e94;
   --chart-2: #837de6;
@@ -31,7 +38,11 @@
   --chart-grid: rgba(255, 255, 255, 0.08);
   --status-good: #58c184;
   --status-warn: #d9a04a;
+  --status-bad: #e0716c;
   --status-muted: #8aa5a1;
+
+  --radius-card: 1.125rem;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 * {
@@ -49,6 +60,19 @@ body {
   color: var(--sea-ink);
   font-family: var(--font-sans);
   background-color: var(--bg-base);
+  /* Lueur d'ambiance discrète en haut de page */
+  background-image:
+    radial-gradient(
+      900px 420px at 18% -10%,
+      rgba(96, 215, 207, 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px 380px at 92% -5%,
+      rgba(131, 125, 230, 0.07),
+      transparent 60%
+    );
+  background-attachment: fixed;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -56,6 +80,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  font-feature-settings: 'ss01', 'cv11';
 }
 
 @layer base {
@@ -66,6 +91,22 @@ body {
 
   a:hover {
     color: #8de5db;
+  }
+
+  /* Accessibilité : anneau de focus visible au clavier, invisible à la souris */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  ::selection {
+    background: rgba(96, 215, 207, 0.28);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
   }
 }
 
@@ -82,15 +123,18 @@ code {
   margin-inline: auto;
 }
 
-/* Carte plate : bordure fine, fond translucide uni, pas d'ombre ni de dégradé. */
+/* Carte : bordure fine, fond translucide uni, liseré haut discret. */
 .island-shell {
   border: 1px solid var(--line);
   background: var(--surface);
-  transition: border-color 180ms ease;
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
 }
 
 .island-shell:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: var(--line-strong);
 }
 
 .island-kicker {
@@ -106,6 +150,7 @@ code {
   color: var(--sea-ink);
   font-size: 1rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .demo-muted {
@@ -120,29 +165,34 @@ code {
   border-radius: 999px;
   background: var(--chip-bg);
   color: var(--sea-ink-soft);
-  padding: 0.35rem 0.65rem;
+  padding: 0.3rem 0.65rem;
   font-size: 0.75rem;
   font-weight: 700;
+  line-height: 1;
 }
 
+/* Tableaux : en-tête collant, colonnes numériques alignées à droite en
+   chiffres tabulaires, survol de ligne. */
 .demo-table-shell {
   overflow-x: auto;
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
 .demo-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   color: var(--sea-ink);
 }
 
 .demo-table th,
 .demo-table td {
   border-bottom: 1px solid var(--line);
-  padding: 0.75rem 1rem;
+  padding: 0.8rem 1rem;
   text-align: left;
+  vertical-align: middle;
 }
 
 .demo-table tr:last-child td {
@@ -150,16 +200,189 @@ code {
 }
 
 .demo-table th {
-  color: var(--sea-ink-soft);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-solid);
+  color: var(--sea-ink-faint);
   font-weight: 700;
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.demo-table tr:hover td {
+.demo-table th.num,
+.demo-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.demo-table tbody tr {
+  transition: background-color 150ms ease;
+}
+
+.demo-table tbody tr:hover td {
   background: rgba(255, 255, 255, 0.03);
+}
+
+/* Boutons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  padding: 0.55rem 0.95rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  border-radius: 0.6rem;
+}
+
+.btn-primary {
+  background: var(--lagoon);
+  color: var(--lagoon-ink);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #7fe0d8;
+}
+
+.btn-secondary {
+  background: var(--surface-strong);
+  border-color: var(--line);
+  color: var(--sea-ink);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--sea-ink-soft);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--sea-ink);
+  border-color: var(--line-strong);
+}
+
+.btn-dashed {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  color: var(--sea-ink-soft);
+}
+
+.btn-dashed:hover:not(:disabled) {
+  border-color: var(--lagoon);
+  color: var(--sea-ink);
+  background: var(--lagoon-tint);
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--status-bad);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(224, 113, 108, 0.1);
+  border-color: rgba(224, 113, 108, 0.35);
+}
+
+/* Champs de saisie */
+.field {
+  width: 100%;
+  min-width: 0;
+  border-radius: 0.7rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--sea-ink);
+  padding: 0.55rem 0.8rem;
+  font: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.field::placeholder {
+  color: var(--sea-ink-faint);
+}
+
+.field:focus {
+  border-color: var(--lagoon);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Squelettes de chargement */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Chip d'icône (KPI, en-têtes de section) */
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.7rem;
+  background: var(--lagoon-tint);
+  color: var(--lagoon);
+  flex-shrink: 0;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 button,
@@ -224,7 +447,8 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rise-in {
+  .rise-in,
+  .skeleton::after {
     animation: none;
   }
 }

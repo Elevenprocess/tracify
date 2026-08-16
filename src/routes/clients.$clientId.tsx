@@ -8,12 +8,12 @@ import { CampaignBadge } from '../components/StatusBadge'
 import AppShell from '../components/AppShell'
 import CampaignsPanel from '../components/CampaignsPanel'
 import {
-  ArrowLeftIcon,
   TargetIcon,
   TrashIcon,
   UsersIcon,
   WalletIcon,
 } from '../components/icons'
+import { EmptyState, PageHeader, PageSkeleton } from '../components/ui'
 import { formatDayRange, formatEuro, formatNumber } from '../lib/format'
 import RequireAuth from '../components/RequireAuth'
 import AccessSection from '../components/AccessSection'
@@ -39,19 +39,20 @@ function ClientDetail() {
   const removeClient = useMutation(api.clients.remove)
   const navigate = useNavigate()
 
-  if (client === undefined) {
-    return <p className="demo-muted m-0 text-sm">Chargement des données…</p>
-  }
+  if (client === undefined) return <PageSkeleton />
 
   if (client === null) {
     return (
-      <main className="py-16 text-center">
-        <h1 className="text-2xl font-bold text-[var(--sea-ink)]">
-          Client introuvable
-        </h1>
-        <Link to="/dashboard" className="mt-4 inline-block">
-          Retour au tableau de bord
-        </Link>
+      <main className="py-10">
+        <EmptyState
+          title="Client introuvable"
+          hint="Il a peut-être été supprimé."
+          action={
+            <Link to="/dashboard" className="btn btn-secondary btn-sm">
+              Retour au tableau de bord
+            </Link>
+          }
+        />
       </main>
     )
   }
@@ -63,21 +64,20 @@ function ClientDetail() {
 
   return (
     <main className="min-w-0">
-      <header className="rise-in mb-6">
-        <nav aria-label="Fil d'Ariane" className="mb-2 text-sm">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-1.5 no-underline text-[var(--sea-ink-soft)] hover:text-[var(--sea-ink)]"
-          >
-            <ArrowLeftIcon className="h-3.5 w-3.5" />
-            Tableau de bord
-          </Link>
-        </nav>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="m-0 text-2xl font-bold tracking-tight text-[var(--sea-ink)] sm:text-3xl">
-            {client.name}
-          </h1>
-          <CampaignBadge status={client.status} />
+      <PageHeader
+        back={{ to: '/dashboard', label: 'Tableau de bord' }}
+        kicker="Fiche client"
+        title={client.name}
+        badge={<CampaignBadge status={client.status} />}
+        meta={
+          <>
+            {client.sector ?? client.adAccountId ?? 'Compte non connecté'} ·{' '}
+            {formatNumber(client.activeCampaigns)} campagne
+            {client.activeCampaigns > 1 ? 's' : ''} active
+            {client.activeCampaigns > 1 ? 's' : ''} · 30 derniers jours
+          </>
+        }
+        actions={
           <button
             type="button"
             aria-label={`Supprimer ${client.name}`}
@@ -91,19 +91,13 @@ function ClientDetail() {
                 navigate({ to: '/dashboard' })
               }
             }}
-            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--line)] bg-transparent px-3 py-1.5 text-sm font-semibold text-[var(--sea-ink-soft)] transition-colors hover:border-[var(--status-warn)] hover:text-[var(--status-warn)]"
+            className="btn btn-danger btn-sm"
           >
             <TrashIcon className="h-3.5 w-3.5" />
             Supprimer
           </button>
-        </div>
-        <p className="m-0 mt-1 text-sm text-[var(--sea-ink-soft)]">
-          {client.sector ?? client.adAccountId ?? 'Compte non connecté'} ·{' '}
-          {formatNumber(client.activeCampaigns)} campagne
-          {client.activeCampaigns > 1 ? 's' : ''} active
-          {client.activeCampaigns > 1 ? 's' : ''} · 30 derniers jours
-        </p>
-      </header>
+        }
+      />
 
       <section className="mb-6">
         <CampaignsPanel
@@ -139,7 +133,11 @@ function ClientDetail() {
           {weekly.length > 0 ? (
             <BarChart data={weekly} formatValue={formatNumber} />
           ) : (
-            <p className="demo-muted m-0 text-sm">Aucune donnée.</p>
+            <EmptyState
+              compact
+              title="Pas encore de données"
+              hint="Les prospects apparaîtront après la première synchronisation Meta."
+            />
           )}
         </article>
         <article className="island-shell rise-in rounded-2xl p-5">
@@ -147,7 +145,11 @@ function ClientDetail() {
           {client.sources.length > 0 ? (
             <SourceSplit data={client.sources} />
           ) : (
-            <p className="demo-muted m-0 text-sm">Aucune donnée.</p>
+            <EmptyState
+              compact
+              title="Aucune source"
+              hint="La répartition se remplit avec les prospects reçus (webhook ou saisie manuelle)."
+            />
           )}
         </article>
       </section>

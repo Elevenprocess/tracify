@@ -4,7 +4,8 @@ import { Link } from '@tanstack/react-router'
 import { useAction, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
-import { MegaphoneIcon } from './icons'
+import { ChevronRightIcon, MegaphoneIcon } from './icons'
+import { EmptyState } from './ui'
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   ACTIVE: { label: 'Active', color: 'var(--status-good)' },
@@ -34,19 +35,28 @@ export default function CampaignsPanel({
 
   return (
     <article className="island-shell rise-in rounded-2xl p-5">
-      <h2 className="demo-section-title mb-1 flex items-center gap-2">
-        <MegaphoneIcon className="h-4 w-4 text-[var(--lagoon)]" />
-        Campagnes Meta
-      </h2>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="demo-section-title m-0 flex items-center gap-2">
+            <MegaphoneIcon className="h-4 w-4 text-[var(--lagoon)]" />
+            Campagnes Meta
+            {campaigns && campaigns.length > 0 && (
+              <span className="tabular font-semibold text-[var(--sea-ink-faint)]">
+                {campaigns.length}
+              </span>
+            )}
+          </h2>
+          {adAccountId && (
+            <p className="m-0 mt-1 text-xs text-[var(--sea-ink-soft)]">
+              Compte publicitaire <span className="tabular">{adAccountId}</span>{' '}
+              · les campagnes actives sont détectées et synchronisées
+              automatiquement.
+            </p>
+          )}
+        </div>
+      </div>
 
-      {adAccountId ? (
-        <p className="m-0 mb-4 text-sm text-[var(--sea-ink-soft)]">
-          Compte publicitaire {adAccountId} — les campagnes actives sont
-          détectées et synchronisées automatiquement.
-        </p>
-      ) : (
-        <AdAccountForm clientSlug={clientSlug} />
-      )}
+      {!adAccountId && <AdAccountForm clientSlug={clientSlug} />}
 
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {(campaigns ?? []).map((c) => {
@@ -56,18 +66,20 @@ export default function CampaignsPanel({
               <Link
                 to="/campagnes/$campaignId"
                 params={{ campaignId: c.metaId }}
-                className="flex items-center gap-3 rounded-xl border border-[var(--line)] px-3.5 py-2.5 no-underline transition-colors hover:border-[var(--lagoon)]"
+                className="group flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.015)] px-3.5 py-3 no-underline transition-colors hover:border-[var(--lagoon-line)] hover:bg-[var(--lagoon-tint)]"
               >
+                <span className="icon-chip">
+                  <MegaphoneIcon className="h-4 w-4" />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="m-0 truncate text-sm font-semibold text-[var(--sea-ink)]">
                     {c.name ?? `Campagne ${c.metaId}`}
                   </p>
-                  <p className="m-0 text-xs text-[var(--sea-ink-soft)]">
-                    {c.metaId}
+                  <p className="m-0 mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+                    <span className="tabular">{c.metaId}</span>
                     {c.lastSyncedAt
                       ? ` · synchronisée ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(c.lastSyncedAt))}`
                       : ' · synchronisation en cours…'}
-                    {' · voir les créatives →'}
                   </p>
                   {c.syncError && (
                     <p className="m-0 mt-1 text-xs text-[var(--status-warn)]">
@@ -88,15 +100,30 @@ export default function CampaignsPanel({
                   />
                   {status?.label ?? (c.status || 'Inconnue')}
                 </span>
+                <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-[var(--sea-ink-faint)] transition-colors group-hover:text-[var(--lagoon)]" />
               </Link>
             </li>
           )
         })}
+        {campaigns === undefined &&
+          [0, 1].map((i) => (
+            <li key={i} className="skeleton h-16 w-full rounded-xl" />
+          ))}
         {campaigns !== undefined && campaigns.length === 0 && (
-          <li className="rounded-xl border border-dashed border-[var(--line)] px-3.5 py-3 text-sm text-[var(--sea-ink-soft)]">
-            {adAccountId
-              ? 'Aucune campagne active détectée pour l’instant — la détection tourne, ou le compte n’a pas de campagne active.'
-              : 'Renseigne le compte publicitaire pour détecter les campagnes.'}
+          <li className="rounded-xl border border-dashed border-[var(--line)]">
+            <EmptyState
+              compact
+              title={
+                adAccountId
+                  ? 'Aucune campagne active détectée'
+                  : 'Aucun compte publicitaire'
+              }
+              hint={
+                adAccountId
+                  ? 'La détection tourne toutes les 6 h — ou le compte n’a pas de campagne active en ce moment.'
+                  : 'Renseigne le compte publicitaire ci-dessus pour détecter les campagnes.'
+              }
+            />
           </li>
         )}
       </ul>
@@ -141,13 +168,9 @@ function AdAccountForm({ clientSlug }: { clientSlug: string }) {
           onChange={(e) => setValue(e.target.value)}
           placeholder="ID du compte, ex. 928367685155102"
           required
-          className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-transparent px-3 py-2 text-sm text-[var(--sea-ink)] outline-none focus:border-[var(--lagoon)]"
+          className="field flex-1"
         />
-        <button
-          type="submit"
-          disabled={saving}
-          className="cursor-pointer rounded-lg bg-white px-3.5 py-2 text-sm font-bold text-black disabled:opacity-50"
-        >
+        <button type="submit" disabled={saving} className="btn btn-primary">
           {saving ? 'Vérification…' : 'Connecter'}
         </button>
       </form>

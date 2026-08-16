@@ -4,7 +4,13 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useAction, useQuery } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../convex/_generated/api'
-import { BriefcaseIcon, FolderIcon, GridIcon, PlusIcon } from './icons'
+import {
+  BriefcaseIcon,
+  FolderIcon,
+  GridIcon,
+  LogOutIcon,
+  PlusIcon,
+} from './icons'
 
 type Kind = 'client' | 'project'
 
@@ -27,7 +33,7 @@ export default function AppShell({
     <div className="flex flex-1 flex-col lg:flex-row">
       <Sidebar initial={sidebarInitial} />
       <div className="min-w-0 flex-1">
-        <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
+        <div className="mx-auto w-full max-w-5xl px-4 py-7 sm:px-8 lg:py-9">
           {children}
         </div>
       </div>
@@ -42,12 +48,14 @@ function Sidebar({ initial }: { initial?: Array<SidebarEntry> }) {
   const clients = (entries ?? []).filter((e) => e.kind !== 'project')
 
   return (
-    <aside className="w-full flex-shrink-0 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-6 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r">
-      <nav aria-label="Navigation principale" className="flex flex-col gap-6">
+    <aside className="w-full flex-shrink-0 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-5 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6">
+      <nav
+        aria-label="Navigation principale"
+        className="flex h-full flex-col gap-6"
+      >
         <div>
-          <p className="island-kicker m-0 mb-2">Plateforme</p>
           <SideLink to="/dashboard">
-            <GridIcon />
+            <GridIcon className="h-4 w-4 flex-shrink-0" />
             Vue d'ensemble
           </SideLink>
         </div>
@@ -88,8 +96,9 @@ function LogoutButton() {
         await signOut()
         navigate({ to: '/login' })
       }}
-      className="mt-auto flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--line)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--sea-ink-soft)] hover:text-[var(--sea-ink)]"
+      className="btn btn-ghost mt-auto w-full justify-start"
     >
+      <LogOutIcon className="h-4 w-4" />
       Se déconnecter
     </button>
   )
@@ -105,14 +114,14 @@ function SideLink({
   children: ReactNode
 }) {
   const base =
-    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold no-underline'
+    'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold no-underline transition-colors'
   return (
     <Link
       to={to}
       params={params}
       className={`${base} text-[var(--sea-ink-soft)] hover:bg-[var(--surface-strong)] hover:text-[var(--sea-ink)]`}
       activeProps={{
-        className: `${base} bg-[var(--surface-strong)] text-[var(--sea-ink)]`,
+        className: `${base} bg-[var(--lagoon-tint)] text-[var(--sea-ink)] before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-[var(--lagoon)]`,
       }}
     >
       {children}
@@ -132,7 +141,7 @@ function SidebarGroup({
   title: string
   kind: Kind
   icon: ReactNode
-  items: Array<{ slug: string; name: string }>
+  items: Array<{ slug: string; name: string; status: SidebarEntry['status'] }>
   loaded: boolean
   emptyLabel: string
   addLabel: string
@@ -169,18 +178,50 @@ function SidebarGroup({
 
   return (
     <div>
-      <p className="island-kicker m-0 mb-2">{title}</p>
-      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+      <p className="island-kicker m-0 mb-2 flex items-center justify-between px-3">
+        {title}
+        {loaded && items.length > 0 && (
+          <span className="tabular font-semibold text-[var(--sea-ink-faint)]">
+            {items.length}
+          </span>
+        )}
+      </p>
+      <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
         {items.map((c) => (
           <li key={c.slug}>
             <SideLink to="/clients/$clientId" params={{ clientId: c.slug }}>
               {icon}
               <span className="truncate">{c.name}</span>
+              <span
+                className="ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                title={
+                  c.status === 'active'
+                    ? 'Actif'
+                    : c.status === 'paused'
+                      ? 'En pause'
+                      : 'Terminé'
+                }
+                style={{
+                  background:
+                    c.status === 'active'
+                      ? 'var(--status-good)'
+                      : c.status === 'paused'
+                        ? 'var(--status-warn)'
+                        : 'var(--status-muted)',
+                }}
+                aria-hidden="true"
+              />
             </SideLink>
           </li>
         ))}
+        {!loaded &&
+          [0, 1].map((i) => (
+            <li key={i} className="px-3 py-1.5">
+              <span className="skeleton block h-4 w-32" />
+            </li>
+          ))}
         {loaded && items.length === 0 && (
-          <li className="px-3 py-1.5 text-sm text-[var(--sea-ink-soft)]">
+          <li className="px-3 py-1.5 text-sm text-[var(--sea-ink-faint)]">
             {emptyLabel}
           </li>
         )}
@@ -189,7 +230,7 @@ function SidebarGroup({
       {showForm ? (
         <form
           onSubmit={onSubmit}
-          className="mt-2 flex flex-col gap-2 rounded-xl border border-[var(--line)] p-3"
+          className="mt-2 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3"
         >
           <label className="text-xs font-semibold text-[var(--sea-ink-soft)]">
             Nom
@@ -201,7 +242,7 @@ function SidebarGroup({
               placeholder={
                 kind === 'project' ? 'Ex. Hermes' : 'Ex. Solaire Plus'
               }
-              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-transparent px-2.5 py-1.5 text-sm text-[var(--sea-ink)] outline-none focus:border-[var(--lagoon)]"
+              className="field mt-1 py-1.5"
             />
           </label>
           <label className="text-xs font-semibold text-[var(--sea-ink-soft)]">
@@ -211,10 +252,10 @@ function SidebarGroup({
               onChange={(e) => setAdAccountId(e.target.value)}
               required
               placeholder="Ex. 928367685155102"
-              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-transparent px-2.5 py-1.5 text-sm text-[var(--sea-ink)] outline-none focus:border-[var(--lagoon)]"
+              className="field mt-1 py-1.5"
             />
           </label>
-          <p className="m-0 text-[11px] leading-snug text-[var(--sea-ink-soft)]">
+          <p className="m-0 text-[11px] leading-snug text-[var(--sea-ink-faint)]">
             Les campagnes actives du compte seront rattachées automatiquement.
           </p>
           {error && (
@@ -224,14 +265,14 @@ function SidebarGroup({
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 cursor-pointer rounded-lg bg-white px-3 py-1.5 text-sm font-bold text-black disabled:opacity-50"
+              className="btn btn-primary btn-sm flex-1"
             >
               {saving ? 'Création…' : 'Créer'}
             </button>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="cursor-pointer rounded-lg border border-[var(--line)] bg-transparent px-3 py-1.5 text-sm font-semibold text-[var(--sea-ink-soft)]"
+              className="btn btn-ghost btn-sm"
             >
               Annuler
             </button>
@@ -241,9 +282,9 @@ function SidebarGroup({
         <button
           type="button"
           onClick={() => setShowForm(true)}
-          className="mt-2 flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-[var(--line)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--sea-ink-soft)] hover:border-[var(--lagoon)] hover:text-[var(--sea-ink)]"
+          className="btn btn-dashed btn-sm mt-2 w-full justify-start"
         >
-          <PlusIcon />
+          <PlusIcon className="h-3.5 w-3.5" />
           {addLabel}
         </button>
       )}

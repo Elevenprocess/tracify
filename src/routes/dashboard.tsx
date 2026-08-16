@@ -5,9 +5,21 @@ import KpiCard from '../components/KpiCard'
 import LineChart from '../components/charts/LineChart'
 import { CampaignBadge } from '../components/StatusBadge'
 import AppShell from '../components/AppShell'
-import { TargetIcon, UsersIcon, WalletIcon } from '../components/icons'
+import {
+  BriefcaseIcon,
+  ChevronRightIcon,
+  TargetIcon,
+  UsersIcon,
+  WalletIcon,
+} from '../components/icons'
 import { formatDay, formatEuro, formatNumber } from '../lib/format'
 import RequireAuth from '../components/RequireAuth'
+import {
+  EmptyState,
+  PageHeader,
+  PageSkeleton,
+  SectionTitle,
+} from '../components/ui'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -26,9 +38,7 @@ function DashboardPage() {
 function Dashboard() {
   const data = useQuery(api.dashboard.overview)
 
-  if (!data) {
-    return <p className="demo-muted m-0 text-sm">Chargement des données…</p>
-  }
+  if (!data) return <PageSkeleton />
 
   const { totals } = data
 
@@ -43,14 +53,11 @@ function Dashboard() {
 
   return (
     <main className="min-w-0">
-      <header className="rise-in mb-6">
-        <p className="island-kicker m-0 mb-1">
-          Vue d'ensemble · 30 derniers jours
-        </p>
-        <h1 className="m-0 text-2xl font-bold tracking-tight text-[var(--sea-ink)] sm:text-3xl">
-          Suivi des campagnes clients
-        </h1>
-      </header>
+      <PageHeader
+        kicker="Vue d'ensemble"
+        title="Suivi des campagnes clients"
+        meta={`30 derniers jours · ${formatNumber(data.clients.length)} ${data.clients.length > 1 ? 'comptes suivis' : 'compte suivi'}`}
+      />
 
       <section
         aria-label="Indicateurs clés"
@@ -98,55 +105,75 @@ function Dashboard() {
       )}
 
       <section className="mt-6">
-        <h2 className="demo-section-title mb-3">Projets & clients</h2>
+        <SectionTitle icon={<BriefcaseIcon className="h-4 w-4" />}>
+          Projets & clients
+        </SectionTitle>
         <div className="demo-table-shell island-shell rounded-2xl">
-          <table className="demo-table min-w-[640px] text-sm">
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Campagnes actives</th>
-                <th>Dépense 30 j</th>
-                <th>Prospects 30 j</th>
-                <th>Coût / prospect</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.clients.map((c) => (
-                <tr key={c.slug}>
-                  <td>
-                    <Link
-                      to="/clients/$clientId"
-                      params={{ clientId: c.slug }}
-                      className="font-semibold text-[var(--sea-ink)] no-underline hover:text-[var(--lagoon-deep)]"
-                    >
-                      {c.name}
-                    </Link>
-                    <span className="block text-xs text-[var(--sea-ink-soft)]">
-                      {c.sector}
-                    </span>
-                  </td>
-                  <td>{formatNumber(c.activeCampaigns)}</td>
-                  <td>{formatEuro(c.spend30d)}</td>
-                  <td>{formatNumber(c.leads30d)}</td>
-                  <td>{c.cpl !== null ? formatEuro(c.cpl) : '—'}</td>
-                  <td>
-                    <CampaignBadge status={c.status} />
-                  </td>
-                </tr>
-              ))}
-              {data.clients.length === 0 && (
+          {data.clients.length > 0 ? (
+            <table className="demo-table min-w-[680px] text-sm">
+              <thead>
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center text-[var(--sea-ink-soft)]"
-                  >
-                    Aucun client — lancer le seed : npx convex run seed:run
-                  </td>
+                  <th>Client</th>
+                  <th className="num">Campagnes</th>
+                  <th className="num">Dépense 30 j</th>
+                  <th className="num">Prospects 30 j</th>
+                  <th className="num">Coût / prospect</th>
+                  <th>Statut</th>
+                  <th aria-label="Ouvrir" />
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.clients.map((c) => (
+                  <tr key={c.slug} className="group">
+                    <td>
+                      <Link
+                        to="/clients/$clientId"
+                        params={{ clientId: c.slug }}
+                        className="flex items-center gap-3 font-semibold text-[var(--sea-ink)] no-underline hover:text-[var(--lagoon)]"
+                      >
+                        <span className="icon-chip h-8 w-8 rounded-lg text-xs font-extrabold uppercase">
+                          {c.name.slice(0, 2)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate">{c.name}</span>
+                          {c.sector && (
+                            <span className="block text-xs font-normal text-[var(--sea-ink-faint)]">
+                              {c.sector}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="num">{formatNumber(c.activeCampaigns)}</td>
+                    <td className="num">{formatEuro(c.spend30d)}</td>
+                    <td className="num">{formatNumber(c.leads30d)}</td>
+                    <td className="num">
+                      {c.cpl !== null ? formatEuro(c.cpl) : '—'}
+                    </td>
+                    <td>
+                      <CampaignBadge status={c.status} />
+                    </td>
+                    <td className="w-8 pr-3 text-[var(--sea-ink-faint)] group-hover:text-[var(--lagoon)]">
+                      <Link
+                        to="/clients/$clientId"
+                        params={{ clientId: c.slug }}
+                        aria-label={`Ouvrir ${c.name}`}
+                        className="text-inherit"
+                      >
+                        <ChevronRightIcon className="h-4 w-4" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <EmptyState
+              icon={<BriefcaseIcon className="h-4 w-4" />}
+              title="Aucun projet ni client pour l'instant"
+              hint="Crée un projet ou un client depuis la barre latérale : ses campagnes Meta actives seront rattachées automatiquement."
+            />
+          )}
         </div>
       </section>
     </main>

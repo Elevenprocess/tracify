@@ -9,9 +9,15 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
 
   if (isLoading) {
     return (
-      <p className="demo-muted m-0 px-8 py-16 text-sm">
-        Vérification de la session…
-      </p>
+      <div
+        aria-busy="true"
+        className="flex flex-1 items-center justify-center px-8 py-24"
+      >
+        <p className="demo-muted m-0 flex items-center gap-2 text-sm">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--lagoon)]" />
+          Vérification de la session…
+        </p>
+      </div>
     )
   }
   if (!isAuthenticated) {
