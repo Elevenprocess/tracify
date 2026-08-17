@@ -9,4 +9,7 @@ crons.interval('sync meta campaigns', { hours: 6 }, internal.meta.syncAll, {})
 // Garde la fonction Vercel chaude (démarrage à froid ≈ 8 s sinon).
 crons.interval('keep vercel warm', { minutes: 5 }, internal.meta.keepWarm, {})
 
+// Nouveaux contacts GoHighLevel → pipeline des clients rattachés.
+crons.interval('sync ghl contacts', { minutes: 10 }, internal.ghl.syncAll, {})
+
 export default crons

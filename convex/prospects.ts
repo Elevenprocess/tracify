@@ -55,6 +55,29 @@ export async function applyStatus(
   await ctx.db.patch(id, { status, history })
 }
 
+// Anti-doublon : même téléphone (chiffres seuls) ou même email chez ce client.
+export async function findDuplicate(
+  ctx: MutationCtx,
+  clientSlug: string,
+  phone: string,
+  email: string | undefined,
+) {
+  const digits = phone.replace(/\D/g, '')
+  const mail = email?.trim().toLowerCase() || undefined
+  if (!digits && !mail) return null
+  const existing = await ctx.db
+    .query('prospects')
+    .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+    .collect()
+  return (
+    existing.find(
+      (p) =>
+        (digits && p.phone.replace(/\D/g, '') === digits) ||
+        (mail && p.email === mail),
+    ) ?? null
+  )
+}
+
 // CRM par campagne : les prospects d'une campagne Meta.
 export const byCampaign = query({
   args: { campaignId: v.string() },

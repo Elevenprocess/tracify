@@ -24,6 +24,12 @@ export interface AccountData {
   lastSyncAt: string | null
   hasAccessCode: boolean
   hasWebhook: boolean
+  ghl: {
+    locationId: string
+    lastSyncAt: string | null
+    error: string | null
+  } | null
+  fromGhl: number
   campaigns: Array<{
     metaId: string
     name: string
@@ -169,8 +175,18 @@ export default function AccountOverview({
             <StatusRow
               icon={<WebhookIcon className="h-3.5 w-3.5" />}
               label="Réception des leads"
-              ok={account.hasWebhook}
-              value={account.hasWebhook ? 'Webhook actif' : 'Non activé'}
+              ok={account.hasWebhook || Boolean(account.ghl)}
+              value={
+                account.ghl && !account.ghl.error
+                  ? account.hasWebhook
+                    ? 'GHL + webhook'
+                    : 'Synchro GHL active'
+                  : account.ghl?.error
+                    ? 'Synchro GHL en erreur'
+                    : account.hasWebhook
+                      ? 'Webhook actif'
+                      : 'Non activé'
+              }
               hint={
                 account.lastLeadAt
                   ? `Dernier prospect ${formatAgo(account.lastLeadAt)}`

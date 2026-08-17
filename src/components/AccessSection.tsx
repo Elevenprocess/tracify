@@ -1,7 +1,16 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from 'convex/react'
+import type { FormEvent } from 'react'
+import { useAction, useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
-import { CheckIcon, CopyIcon, KeyIcon, WebhookIcon } from './icons'
+import { formatAgo, formatNumber } from '../lib/format'
+import {
+  AlertIcon,
+  CheckIcon,
+  CopyIcon,
+  KeyIcon,
+  RefreshIcon,
+  WebhookIcon,
+} from './icons'
 import { SectionTitle } from './ui'
 
 // URL du webhook : le site Convex (.convex.site) dérivé de l'URL du déploiement.
@@ -15,7 +24,19 @@ const WEBHOOK_URL = `${(
 
 // Code d'accès client : généré sur la fiche client, saisi par le client sur
 // la page de connexion pour ouvrir le suivi public de ses campagnes.
-export default function AccessSection({ clientSlug }: { clientSlug: string }) {
+export default function AccessSection({
+  clientSlug,
+  ghl,
+  fromGhl = 0,
+}: {
+  clientSlug: string
+  ghl?: {
+    locationId: string
+    lastSyncAt: string | null
+    error: string | null
+  } | null
+  fromGhl?: number
+}) {
   const current = useQuery(api.access.codeForClient, { clientSlug })
   const generate = useMutation(api.access.generate)
   const revoke = useMutation(api.access.revoke)
@@ -109,8 +130,161 @@ export default function AccessSection({ clientSlug }: { clientSlug: string }) {
         </article>
 
         <WebhookCard clientSlug={clientSlug} />
+        <GhlCard clientSlug={clientSlug} ghl={ghl ?? null} fromGhl={fromGhl} />
       </div>
     </section>
+  )
+}
+
+// Synchro GoHighLevel : on renseigne l'ID du sous-compte (Location ID) et
+// Tracify récupère ses nouveaux contacts toutes les 10 min — aucun réglage
+// côté GHL. Bouton pour lancer une synchro immédiate.
+export function GhlCard({
+  clientSlug,
+  ghl,
+  fromGhl,
+}: {
+  clientSlug: string
+  ghl: {
+    locationId: string
+    lastSyncAt: string | null
+    error: string | null
+  } | null
+  fromGhl: number
+}) {
+  const setLocation = useMutation(api.ghl.setLocation)
+  const syncNow = useAction(api.ghl.syncNow)
+  const [value, setValue] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault()
+    if (pending) return
+    setPending(true)
+    try {
+      await setLocation({ clientSlug, locationId: value })
+      setEditing(false)
+      setValue('')
+      setResult(null)
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const run = async () => {
+    if (pending) return
+    setPending(true)
+    setResult(null)
+    try {
+      const r = await syncNow({ clientSlug })
+      setResult(
+        r.ok
+          ? `${formatNumber(r.inserted)} nouveau${r.inserted > 1 ? 'x' : ''} prospect${r.inserted > 1 ? 's' : ''} · ${formatNumber(r.duplicates)} déjà connu${r.duplicates > 1 ? 's' : ''}${r.skipped ? ` · ${formatNumber(r.skipped)} sans coordonnées ignoré${r.skipped > 1 ? 's' : ''}` : ''}`
+          : `Erreur : ${r.error ?? 'inconnue'}`,
+      )
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <article className="island-shell rise-in flex flex-col rounded-2xl p-5 lg:col-span-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="m-0 flex items-center gap-2 text-sm font-bold text-[var(--sea-ink)]">
+            <RefreshIcon className="h-4 w-4 text-[var(--lagoon)]" />
+            Synchro GoHighLevel
+          </h3>
+          <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+            Rattache le sous-compte GHL du client : ses nouveaux contacts sont
+            récupérés automatiquement toutes les 10 min (téléphone/email requis,
+            doublons ignorés), avec leur provenance (pub Facebook, simulateur,
+            saisie…). Rien à configurer côté GHL.
+          </p>
+        </div>
+        {ghl && !editing && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={run}
+            className="btn btn-primary btn-sm"
+          >
+            <RefreshIcon
+              className={`h-3.5 w-3.5 ${pending ? 'animate-spin' : ''}`}
+            />
+            {pending ? 'Synchro…' : 'Synchroniser maintenant'}
+          </button>
+        )}
+      </div>
+
+      {ghl && !editing ? (
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--sea-ink-soft)]">
+          <span>
+            Sous-compte{' '}
+            <span className="tabular text-[var(--sea-ink)]">
+              {ghl.locationId}
+            </span>
+          </span>
+          <span>
+            {ghl.lastSyncAt
+              ? `Dernière synchro ${formatAgo(ghl.lastSyncAt)}`
+              : 'Pas encore synchronisé'}
+          </span>
+          <span>
+            <strong className="text-[var(--sea-ink)]">
+              {formatNumber(fromGhl)}
+            </strong>{' '}
+            prospect{fromGhl > 1 ? 's' : ''} venu{fromGhl > 1 ? 's' : ''} de GHL
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setValue(ghl.locationId)
+              setEditing(true)
+            }}
+            className="btn btn-ghost btn-sm"
+          >
+            Modifier
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={save} className="mt-4 flex flex-wrap gap-2">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Location ID GHL, ex. djBlEHfSx8UmYXjUqhCS"
+            className="field min-w-0 flex-1"
+          />
+          <button type="submit" disabled={pending} className="btn btn-primary">
+            {ghl ? 'Enregistrer' : 'Rattacher'}
+          </button>
+          {ghl && (
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="btn btn-ghost"
+            >
+              Annuler
+            </button>
+          )}
+        </form>
+      )}
+
+      {ghl?.error && !editing && (
+        <p className="m-0 mt-3 flex items-center gap-2 text-xs text-[var(--status-warn)]">
+          <AlertIcon className="h-3.5 w-3.5 flex-shrink-0" />
+          Dernière synchro en erreur : {ghl.error}
+        </p>
+      )}
+      {result && (
+        <p className="m-0 mt-3 flex items-center gap-2 text-xs text-[var(--sea-ink)]">
+          <CheckIcon className="h-3.5 w-3.5 text-[var(--status-good)]" />
+          {result}
+        </p>
+      )}
+    </article>
   )
 }
 

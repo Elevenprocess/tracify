@@ -70,6 +70,8 @@ export const COLUMNS: Array<{
   },
 ]
 
+const COLUMN_LIMIT = 15
+
 const columnOf = (status: string) =>
   COLUMNS.find((c) => c.status === status) ?? COLUMNS[0]
 
@@ -159,6 +161,10 @@ export function PipelineBoard({
   const [dragOver, setDragOver] = useState<ProspectStatus | null>(null)
   const [onlyNew, setOnlyNew] = useState(false)
   const [openId, setOpenId] = useState<Id<'prospects'> | null>(null)
+  // Colonnes longues : on affiche les plus récents, le reste à la demande.
+  const [expanded, setExpanded] = useState<
+    Partial<Record<ProspectStatus, boolean>>
+  >({})
 
   const newCount = prospects.filter(isNew).length
   const shown = onlyNew ? prospects.filter(isNew) : prospects
@@ -232,7 +238,10 @@ export function PipelineBoard({
               </p>
 
               <div className="flex flex-1 flex-col gap-2">
-                {cards.map((p) => (
+                {(expanded[col.status]
+                  ? cards
+                  : cards.slice(0, COLUMN_LIMIT)
+                ).map((p) => (
                   <ProspectCard
                     key={p.id}
                     prospect={p}
@@ -246,6 +255,22 @@ export function PipelineBoard({
                     onRemove={onRemove}
                   />
                 ))}
+                {cards.length > COLUMN_LIMIT && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpanded((e) => ({
+                        ...e,
+                        [col.status]: !e[col.status],
+                      }))
+                    }
+                    className="btn btn-dashed btn-sm w-full justify-center"
+                  >
+                    {expanded[col.status]
+                      ? 'Réduire'
+                      : `Voir les ${cards.length - COLUMN_LIMIT} autres`}
+                  </button>
+                )}
                 {cards.length === 0 && (
                   <p className="m-0 flex flex-1 items-center justify-center rounded-xl border border-dashed border-[var(--line)] px-3 py-5 text-center text-xs text-[var(--sea-ink-faint)]">
                     {onlyNew ? 'Aucun nouveau prospect' : emptyHint}
@@ -410,6 +435,7 @@ const BY_LABELS: Record<string, string> = {
   admin: 'par Eleven Process',
   client: 'par le client',
   webhook: 'reçu automatiquement',
+  ghl: 'synchronisé depuis GoHighLevel',
 }
 
 // Fiche détaillée d'un prospect : coordonnées, campagne, historique des

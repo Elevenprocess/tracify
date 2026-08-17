@@ -20,6 +20,11 @@ function countPipeline(rows: Array<Doc<'prospects'>>): Pipeline {
   for (const r of rows) p[r.status] += 1
   return p
 }
+function countBy(values: Array<string>) {
+  const m = new Map<string, number>()
+  for (const v of values) m.set(v, (m.get(v) ?? 0) + 1)
+  return m
+}
 const cutoffIso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString()
 
 // Vue d'ensemble : agrégats par client + série quotidienne globale
@@ -265,6 +270,14 @@ export const client = query({
         lastSyncAt: lastSync,
         hasAccessCode: accessCodes.some((c) => !c.revokedAt),
         hasWebhook: Boolean(client.webhookKey),
+        ghl: client.ghlLocationId
+          ? {
+              locationId: client.ghlLocationId,
+              lastSyncAt: client.ghlLastSyncAt ?? null,
+              error: client.ghlSyncError ?? null,
+            }
+          : null,
+        fromGhl: prospects.filter((p) => p.ghlContactId).length,
         campaigns: campaigns
           .map((c) => ({
             metaId: c.metaId,
@@ -283,9 +296,14 @@ export const client = query({
         })
         .sort((a, b) => a.start.localeCompare(b.start))
         .slice(-4),
-      sources: sources
-        .map((s) => ({ label: s.source, value: s.count }))
-        .sort((a, b) => b.value - a.value),
+      // Répartition par source : les prospects réels d'abord, la table de
+      // maquette (sourceStats) seulement s'il n'y en a aucun.
+      sources: (prospects.length > 0
+        ? [...countBy(prospects.map((p) => p.source)).entries()].map(
+            ([label, value]) => ({ label, value }),
+          )
+        : sources.map((s) => ({ label: s.source, value: s.count }))
+      ).sort((a, b) => b.value - a.value),
       prospects: prospects
         .sort((a, b) => b.date.localeCompare(a.date))
         .slice(0, 20)

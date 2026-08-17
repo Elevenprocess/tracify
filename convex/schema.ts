@@ -26,6 +26,11 @@ export default defineSchema({
     activeCampaigns: v.optional(v.number()),
     // Clé secrète du webhook d'entrée des leads (POST /api/leads).
     webhookKey: v.optional(v.string()),
+    // Sous-compte GoHighLevel : ses nouveaux contacts sont récupérés
+    // automatiquement (synchro toutes les 10 min) dans le pipeline.
+    ghlLocationId: v.optional(v.string()),
+    ghlLastSyncAt: v.optional(v.string()),
+    ghlSyncError: v.optional(v.string()),
     createdAt: v.string(),
   })
     .index('by_slug', ['slug'])
@@ -117,8 +122,10 @@ export default defineSchema({
       v.literal('qualified'),
       v.literal('lost'),
     ),
-    // Arrivé automatiquement par le webhook (sinon saisie manuelle).
+    // Arrivé automatiquement (webhook ou synchro GHL) — sinon saisie manuelle.
     viaWebhook: v.optional(v.boolean()),
+    // ID du contact GoHighLevel d'origine (anti-doublon de la synchro).
+    ghlContactId: v.optional(v.string()),
     // Notes internes (admin) sur le prospect.
     notes: v.optional(v.string()),
     // Historique des changements de statut, du plus ancien au plus récent.
@@ -135,5 +142,6 @@ export default defineSchema({
     createdAt: v.string(),
   })
     .index('by_client', ['clientSlug'])
-    .index('by_campaign', ['campaignId']),
+    .index('by_campaign', ['campaignId'])
+    .index('by_ghl', ['ghlContactId']),
 })

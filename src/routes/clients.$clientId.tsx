@@ -176,7 +176,11 @@ function ClientDetail() {
 
       <ClientProspectsBoard clientSlug={client.slug} />
 
-      <AccessSection clientSlug={client.slug} />
+      <AccessSection
+        clientSlug={client.slug}
+        ghl={client.account.ghl}
+        fromGhl={client.account.fromGhl}
+      />
     </main>
   )
 }
