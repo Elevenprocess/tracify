@@ -9,6 +9,18 @@ import tailwindcss from '@tailwindcss/vite'
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  build: {
+    rollupOptions: {
+      output: {
+        // Noms de fichiers en hash seul : un chunk nommé d'après son module
+        // (« trackingCode-… », « CampaignOverview-… ») se fait bloquer par
+        // les bloqueurs de pub (ERR_BLOCKED_BY_CLIENT) et casse la page.
+        chunkFileNames: 'assets/c-[hash].js',
+        entryFileNames: 'assets/e-[hash].js',
+        assetFileNames: 'assets/a-[hash][extname]',
+      },
+    },
+  },
   plugins: [
     devtools(),
     tailwindcss(),

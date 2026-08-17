@@ -4,7 +4,7 @@ import { Navigate, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvex, useConvexAuth } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../convex/_generated/api'
-import { TRACKING_CODE_KEY, normalizeTrackingCode } from '../lib/trackingCode'
+import { ACCESS_CODE_KEY, normalizeAccessCode } from '../lib/accessCode'
 import { AlertIcon, EyeIcon, KeyIcon } from '../components/icons'
 
 export const Route = createFileRoute('/login')({
@@ -124,14 +124,14 @@ function TrackingCodeCard() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    const cleaned = normalizeTrackingCode(code)
+    const cleaned = normalizeAccessCode(code)
     if (!cleaned) return
     setChecking(true)
     setError(null)
     try {
       const valid = await convex.query(api.access.check, { code: cleaned })
       if (valid) {
-        localStorage.setItem(TRACKING_CODE_KEY, cleaned)
+        localStorage.setItem(ACCESS_CODE_KEY, cleaned)
         navigate({ to: '/suivi' })
       } else {
         setError('Code invalide ou désactivé. Vérifie auprès de ton contact.')
@@ -174,7 +174,7 @@ function TrackingCodeCard() {
         />
         <button
           type="submit"
-          disabled={checking || normalizeTrackingCode(code).length === 0}
+          disabled={checking || normalizeAccessCode(code).length === 0}
           className="btn btn-primary"
         >
           {checking ? '…' : 'Voir'}

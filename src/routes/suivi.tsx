@@ -6,7 +6,7 @@ import CampaignOverview, { STATUS_LABELS } from '../components/CampaignOverview'
 import { PipelineBoard } from '../components/ProspectsBoard'
 import { EmptyState, PageSkeleton } from '../components/ui'
 import { LogOutIcon, MegaphoneIcon } from '../components/icons'
-import { TRACKING_CODE_KEY } from '../lib/trackingCode'
+import { ACCESS_CODE_KEY } from '../lib/accessCode'
 
 export const Route = createFileRoute('/suivi')({
   component: SuiviPage,
@@ -22,7 +22,7 @@ function SuiviPage() {
   const [selected, setSelected] = useState<string | null>(null)
 
   useEffect(() => {
-    setCode(localStorage.getItem(TRACKING_CODE_KEY))
+    setCode(localStorage.getItem(ACCESS_CODE_KEY))
   }, [])
 
   useEffect(() => {
@@ -37,7 +37,7 @@ function SuiviPage() {
   const setProspectStatus = useMutation(api.access.trackingSetStatus)
 
   const quit = () => {
-    localStorage.removeItem(TRACKING_CODE_KEY)
+    localStorage.removeItem(ACCESS_CODE_KEY)
     navigate({ to: '/login' })
   }
 
