@@ -179,6 +179,18 @@ export const trackingSetStatus = mutation({
   },
 })
 
+export const trackingSetClientNotes = mutation({
+  args: { code: v.string(), id: v.id('prospects'), notes: v.string() },
+  handler: async (ctx, { code, id, notes }) => {
+    const clientSlug = await clientSlugForCode(ctx, code)
+    if (!clientSlug) throw new Error('Code invalide.')
+    const prospect = await ctx.db.get(id)
+    if (!prospect || prospect.clientSlug !== clientSlug)
+      throw new Error('Prospect introuvable.')
+    await ctx.db.patch(id, { clientNotes: notes.trim() || undefined })
+  },
+})
+
 // --- Aperçu admin « voir comme le client » --------------------------------
 // Même vue que l'espace client, mais ouverte depuis la fiche client par un
 // membre connecté (aucun code nécessaire).

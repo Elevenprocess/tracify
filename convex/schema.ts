@@ -128,6 +128,8 @@ export default defineSchema({
     ghlContactId: v.optional(v.string()),
     // Notes internes (admin) sur le prospect.
     notes: v.optional(v.string()),
+    // Notes du client (saisies dans son espace de suivi, visibles par l'admin).
+    clientNotes: v.optional(v.string()),
     // Historique des changements de statut, du plus ancien au plus récent.
     history: v.optional(
       v.array(

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
@@ -8,9 +9,13 @@ import { EmptyState, PageSkeleton } from '../components/ui'
 import {
   ArrowLeftIcon,
   EyeIcon,
+  GridIcon,
   LogOutIcon,
   MegaphoneIcon,
+  TrendIcon,
+  UsersIcon,
 } from '../components/icons'
+import ClientOverview from '../components/ClientOverview'
 import { ACCESS_CODE_KEY } from '../lib/accessCode'
 
 export const Route = createFileRoute('/suivi')({
@@ -47,6 +52,7 @@ function AdminPreview({ clientSlug }: { clientSlug: string }) {
     ready ? { clientSlug } : 'skip',
   )
   const setStatus = useMutation(api.prospects.setStatus)
+  const setClientNotes = useMutation(api.prospects.setClientNotes)
 
   return (
     <>
@@ -74,6 +80,7 @@ function AdminPreview({ clientSlug }: { clientSlug: string }) {
         data={ready ? data : undefined}
         prospects={prospects ?? []}
         onSetStatus={(id, status) => setStatus({ id, status })}
+        onSaveClientNotes={(id, notes) => setClientNotes({ id, notes })}
         quitLabel="Fermer l'aperçu"
         onQuit={() =>
           navigate({
@@ -109,6 +116,7 @@ function ClientSuivi() {
     code ? { code } : 'skip',
   )
   const setProspectStatus = useMutation(api.access.trackingSetStatus)
+  const setClientNotes = useMutation(api.access.trackingSetClientNotes)
 
   const quit = () => {
     localStorage.removeItem(ACCESS_CODE_KEY)
@@ -121,6 +129,9 @@ function ClientSuivi() {
       prospects={prospects ?? []}
       onSetStatus={(id, next) => {
         if (code) setProspectStatus({ code, id, status: next })
+      }}
+      onSaveClientNotes={(id, notes) => {
+        if (code) setClientNotes({ code, id, notes })
       }}
       quitLabel="Quitter"
       onQuit={quit}
@@ -135,10 +146,13 @@ type TrackingData = NonNullable<
   ReturnType<typeof useQuery<typeof api.access.trackingView>>
 >
 
+type ClientTab = 'performance' | 'prospects'
+
 function SuiviView({
   data,
   prospects,
   onSetStatus,
+  onSaveClientNotes,
   quitLabel,
   onQuit,
   invalidTitle = 'Client introuvable',
@@ -148,19 +162,24 @@ function SuiviView({
   data: TrackingData | null | undefined
   prospects: Parameters<typeof PipelineBoard>[0]['prospects']
   onSetStatus: Parameters<typeof PipelineBoard>[0]['onSetStatus']
+  onSaveClientNotes: NonNullable<
+    Parameters<typeof PipelineBoard>[0]['onSaveClientNotes']
+  >
   quitLabel: string
   onQuit: () => void
   invalidTitle?: string
   invalidHint: string
   invalidAction?: string
 }) {
+  // null = vue d'ensemble, sinon l'ID Meta de la campagne ouverte
   const [selected, setSelected] = useState<string | null>(null)
+  const [tab, setTab] = useState<ClientTab>('performance')
   const quit = onQuit
 
   if (data === undefined) {
     return (
       <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
-        <PageSkeleton kpis={6} />
+        <PageSkeleton kpis={4} />
       </main>
     )
   }
@@ -181,42 +200,59 @@ function SuiviView({
     )
   }
 
-  const campaign =
-    data.campaigns.find((c) => c.metaId === selected) ?? data.campaigns.at(0)
+  const campaign = selected
+    ? data.campaigns.find((c) => c.metaId === selected)
+    : undefined
   const status = campaign?.status ? STATUS_LABELS[campaign.status] : undefined
+  const campaignNames = Object.fromEntries(
+    data.campaigns.map((c) => [c.metaId, c.name]),
+  )
+  const campaignProspects = campaign
+    ? prospects.filter((p) => p.campaignId === campaign.metaId)
+    : []
+  const openCampaign = (metaId: string, t: ClientTab = 'performance') => {
+    setSelected(metaId)
+    setTab(t)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const lastSync = data.campaigns.reduce<string | null>(
+    (m, c) =>
+      c.lastSyncedAt && (m === null || c.lastSyncedAt > m) ? c.lastSyncedAt : m,
+    null,
+  )
+  const updated = campaign ? campaign.lastSyncedAt : lastSync
 
   return (
     <main className="mx-auto w-full min-w-0 max-w-5xl px-4 py-7 sm:px-8 lg:py-9">
-      <header className="rise-in mb-7">
+      <header className="rise-in mb-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="island-kicker m-0 mb-1.5">
               Suivi de vos publicités · {data.client.name}
             </p>
-            {campaign && (
-              <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="m-0 text-2xl font-extrabold tracking-tight text-[var(--sea-ink)] sm:text-[1.9rem]">
-                    {campaign.name}
-                  </h1>
-                  {status && (
-                    <span className="demo-pill whitespace-nowrap">
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: status.color }}
-                        aria-hidden="true"
-                      />
-                      {status.label}
-                    </span>
-                  )}
-                </div>
-                <p className="m-0 mt-1.5 text-sm text-[var(--sea-ink-soft)]">
-                  30 derniers jours
-                  {campaign.lastSyncedAt &&
-                    ` · mis à jour ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(campaign.lastSyncedAt))}`}
-                </p>
-              </>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="m-0 text-2xl font-extrabold tracking-tight text-[var(--sea-ink)] sm:text-[1.9rem]">
+                {campaign ? campaign.name : "Vue d'ensemble"}
+              </h1>
+              {status && (
+                <span className="demo-pill whitespace-nowrap">
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: status.color }}
+                    aria-hidden="true"
+                  />
+                  {status.label}
+                </span>
+              )}
+            </div>
+            <p className="m-0 mt-1.5 text-sm text-[var(--sea-ink-soft)]">
+              {campaign
+                ? '30 derniers jours'
+                : `${data.campaigns.length} campagne${data.campaigns.length > 1 ? 's' : ''} · 30 derniers jours`}
+              {updated &&
+                ` · mis à jour ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(updated))}`}
+            </p>
           </div>
           <button type="button" onClick={quit} className="btn btn-ghost btn-sm">
             <LogOutIcon className="h-3.5 w-3.5" />
@@ -224,54 +260,141 @@ function SuiviView({
           </button>
         </div>
 
-        {data.campaigns.length > 1 && (
-          <nav
-            aria-label="Choix de la campagne"
-            className="mt-5 inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1"
+        {/* Navigation : vue d'ensemble + une entrée par campagne */}
+        <nav
+          aria-label="Navigation"
+          className="mt-5 inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1"
+        >
+          <NavButton
+            active={!campaign}
+            onClick={() => {
+              setSelected(null)
+            }}
           >
-            {data.campaigns.map((c) => {
-              const active = c.metaId === campaign?.metaId
-              return (
-                <button
-                  key={c.metaId}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setSelected(c.metaId)}
-                  className={`max-w-[16rem] cursor-pointer truncate rounded-lg border-0 px-3 py-1.5 text-sm font-semibold transition-colors ${
-                    active
-                      ? 'bg-[var(--lagoon)] text-[var(--lagoon-ink)]'
-                      : 'bg-transparent text-[var(--sea-ink-soft)] hover:bg-[var(--surface-strong)] hover:text-[var(--sea-ink)]'
-                  }`}
-                >
-                  {c.name}
-                </button>
-              )
-            })}
-          </nav>
-        )}
+            <GridIcon className="h-3.5 w-3.5" />
+            Vue d'ensemble
+          </NavButton>
+          {data.campaigns.map((c) => (
+            <NavButton
+              key={c.metaId}
+              active={c.metaId === campaign?.metaId}
+              onClick={() => openCampaign(c.metaId, tab)}
+            >
+              <MegaphoneIcon className="h-3.5 w-3.5" />
+              <span className="max-w-[14rem] truncate">{c.name}</span>
+            </NavButton>
+          ))}
+        </nav>
       </header>
 
-      {campaign ? (
-        <CampaignOverview data={campaign} compact />
-      ) : (
-        <div className="island-shell rounded-2xl">
-          <EmptyState
-            icon={<MegaphoneIcon className="h-4 w-4" />}
-            title="Aucune campagne rattachée pour l'instant"
-            hint="Vos campagnes apparaîtront ici dès leur lancement — revenez bientôt."
+      {!campaign ? (
+        <>
+          <ClientOverview
+            campaigns={data.campaigns}
+            prospects={prospects}
+            onSelectCampaign={openCampaign}
           />
-        </div>
-      )}
+          <PipelineBoard
+            title="Tous vos prospects"
+            prospects={prospects}
+            onSetStatus={onSetStatus}
+            onSaveClientNotes={onSaveClientNotes}
+            campaignNames={campaignNames}
+            emptyHint="Aucun prospect pour l'instant"
+          />
+        </>
+      ) : (
+        <>
+          {/* Onglets de la campagne */}
+          <div
+            role="tablist"
+            aria-label="Sections de la campagne"
+            className="mb-5 flex gap-1 border-b border-[var(--line)]"
+          >
+            <TabButton
+              active={tab === 'performance'}
+              onClick={() => setTab('performance')}
+            >
+              <TrendIcon className="h-3.5 w-3.5" />
+              Performance & créatives
+            </TabButton>
+            <TabButton
+              active={tab === 'prospects'}
+              onClick={() => setTab('prospects')}
+            >
+              <UsersIcon className="h-3.5 w-3.5" />
+              Prospects
+              <span className="tabular rounded-md bg-[var(--surface-strong)] px-1.5 py-0.5 text-[11px] font-bold">
+                {campaignProspects.length}
+              </span>
+            </TabButton>
+          </div>
 
-      <PipelineBoard
-        title="Vos prospects"
-        prospects={prospects}
-        onSetStatus={onSetStatus}
-        campaignNames={Object.fromEntries(
-          data.campaigns.map((c) => [c.metaId, c.name]),
-        )}
-        emptyHint="Aucun prospect pour l'instant"
-      />
+          {tab === 'performance' ? (
+            <CampaignOverview data={campaign} compact />
+          ) : (
+            <PipelineBoard
+              title="Prospects de la campagne"
+              prospects={campaignProspects}
+              onSetStatus={onSetStatus}
+              onSaveClientNotes={onSaveClientNotes}
+              campaignNames={campaignNames}
+              emptyHint="Aucun prospect pour cette campagne"
+            />
+          )}
+        </>
+      )}
     </main>
+  )
+}
+
+function NavButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex max-w-full cursor-pointer items-center gap-1.5 rounded-lg border-0 px-3 py-1.5 text-sm font-semibold transition-colors ${
+        active
+          ? 'bg-[var(--lagoon)] text-[var(--lagoon-ink)]'
+          : 'bg-transparent text-[var(--sea-ink-soft)] hover:bg-[var(--surface-strong)] hover:text-[var(--sea-ink)]'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`-mb-px flex cursor-pointer items-center gap-1.5 border-0 border-b-2 bg-transparent px-3 py-2.5 text-sm font-semibold transition-colors ${
+        active
+          ? 'border-[var(--lagoon)] text-[var(--sea-ink)]'
+          : 'border-transparent text-[var(--sea-ink-soft)] hover:text-[var(--sea-ink)]'
+      }`}
+    >
+      {children}
+    </button>
   )
 }

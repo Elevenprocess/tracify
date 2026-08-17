@@ -28,6 +28,7 @@ export const toCard = (p: Doc<'prospects'>) => ({
   createdAt: p.createdAt,
   history: p.history ?? [{ status: p.status, at: p.createdAt }],
   notes: p.notes ?? '',
+  clientNotes: p.clientNotes ?? '',
 })
 
 export const toPublicCard = (p: Doc<'prospects'>) => ({
@@ -155,6 +156,17 @@ export const setNotes = mutation({
     const p = await ctx.db.get(id)
     if (!p) throw new Error('Prospect introuvable.')
     await ctx.db.patch(id, { notes: notes.trim() || undefined })
+  },
+})
+
+// Notes du client, modifiables aussi depuis l'aperçu admin.
+export const setClientNotes = mutation({
+  args: { id: v.id('prospects'), notes: v.string() },
+  handler: async (ctx, { id, notes }) => {
+    await requireUser(ctx)
+    const p = await ctx.db.get(id)
+    if (!p) throw new Error('Prospect introuvable.')
+    await ctx.db.patch(id, { clientNotes: notes.trim() || undefined })
   },
 })
 
