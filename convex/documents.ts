@@ -4,30 +4,37 @@
  */
 import { v } from 'convex/values'
 import { internalMutation, mutation, query } from './_generated/server'
+import type { QueryCtx } from './_generated/server'
 import { requireUser } from './guard'
 
 const MAX_SIZE = 50 * 1024 * 1024 // 50 Mo
+
+// Liste du dossier avec URL de téléchargement — partagée avec l'espace
+// client (access.ts).
+export async function listDocuments(ctx: QueryCtx, clientSlug: string) {
+  const rows = await ctx.db
+    .query('documents')
+    .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+    .collect()
+  rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return Promise.all(
+    rows.map(async (d) => ({
+      id: d._id,
+      fileName: d.fileName,
+      mimeType: d.mimeType,
+      size: d.size,
+      remark: d.remark,
+      createdAt: d.createdAt,
+      url: await ctx.storage.getUrl(d.storageId),
+    })),
+  )
+}
 
 export const list = query({
   args: { clientSlug: v.string() },
   handler: async (ctx, { clientSlug }) => {
     await requireUser(ctx)
-    const rows = await ctx.db
-      .query('documents')
-      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
-      .collect()
-    rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    return Promise.all(
-      rows.map(async (d) => ({
-        id: d._id,
-        fileName: d.fileName,
-        mimeType: d.mimeType,
-        size: d.size,
-        remark: d.remark,
-        createdAt: d.createdAt,
-        url: await ctx.storage.getUrl(d.storageId),
-      })),
-    )
+    return listDocuments(ctx, clientSlug)
   },
 })
 

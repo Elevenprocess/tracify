@@ -169,8 +169,8 @@ export default function ClientOverview({
             ))}
           </ul>
           <p className="m-0 mt-3 text-xs text-[var(--sea-ink-soft)]">
-            Ouvrez une campagne, onglet « Prospects », pour traiter la liste en
-            kanban et consulter le dossier de chacun.
+            Rubrique « Prospects » dans la barre latérale : la liste en kanban,
+            filtrable par campagne, avec le dossier de chacun.
           </p>
         </article>
       </section>

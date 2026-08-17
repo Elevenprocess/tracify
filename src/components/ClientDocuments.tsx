@@ -435,3 +435,74 @@ function DocumentRow({
     </li>
   )
 }
+
+export interface DocumentItem {
+  id: Id<'documents'>
+  fileName: string
+  mimeType: string
+  size: number
+  remark: string
+  createdAt: string
+  url: string | null
+}
+
+// Liste en lecture seule (espace client) : remarque en titre, téléchargement.
+export function DocumentList({
+  docs,
+  emptyHint = 'Les fichiers partagés par Eleven Process apparaîtront ici.',
+}: {
+  docs: Array<DocumentItem> | undefined
+  emptyHint?: string
+}) {
+  return (
+    <div className="island-shell rise-in rounded-2xl">
+      {docs === undefined ? (
+        <div className="p-4">
+          <div className="skeleton mb-2 h-12 w-full" />
+          <div className="skeleton h-12 w-full" />
+        </div>
+      ) : docs.length === 0 ? (
+        <EmptyState
+          icon={<FolderIcon className="h-4 w-4" />}
+          title="Dossier vide"
+          hint={emptyHint}
+        />
+      ) : (
+        <ul className="m-0 list-none divide-y divide-[var(--line)] p-0">
+          {docs.map((d) => {
+            const kind = fileKind(d.fileName, d.mimeType)
+            return (
+              <li
+                key={d.id}
+                className="flex flex-wrap items-center gap-3 px-4 py-3"
+              >
+                <KindBadge label={kind.label} color={kind.color} />
+                <div className="min-w-0 flex-1 basis-56">
+                  <p className="m-0 truncate text-sm font-semibold text-[var(--sea-ink)]">
+                    {d.remark || d.fileName}
+                  </p>
+                  <p className="m-0 mt-0.5 truncate text-[11px] text-[var(--sea-ink-faint)]">
+                    {d.fileName} · {formatSize(d.size)} ·{' '}
+                    {formatDateTime(d.createdAt)}
+                  </p>
+                </div>
+                {d.url && (
+                  <a
+                    href={d.url}
+                    target="_blank"
+                    rel="noopener"
+                    download={d.fileName}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    <DownloadIcon className="h-3.5 w-3.5" />
+                    Télécharger
+                  </a>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}

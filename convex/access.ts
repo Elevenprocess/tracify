@@ -10,6 +10,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server'
 import { requireUser } from './guard'
 import { buildCampaignDetail } from './meta'
 import { STATUS, applyStatus, toPublicCard } from './prospects'
+import { listDocuments } from './documents'
 
 // Alphabet sans caractères ambigus (pas de O/0, I/L/1) : facile à dicter.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -167,6 +168,16 @@ export const trackingProspects = query({
   },
 })
 
+// Dossier du client (fichiers déposés par l'équipe), en lecture.
+export const trackingDocuments = query({
+  args: { code: v.string() },
+  handler: async (ctx, { code }) => {
+    const clientSlug = await clientSlugForCode(ctx, code)
+    if (!clientSlug) return null
+    return listDocuments(ctx, clientSlug)
+  },
+})
+
 export const trackingSetStatus = mutation({
   args: { code: v.string(), id: v.id('prospects'), status: STATUS },
   handler: async (ctx, { code, id, status }) => {
@@ -200,6 +211,14 @@ export const previewView = query({
   handler: async (ctx, { clientSlug }) => {
     await requireUser(ctx)
     return buildTrackingView(ctx, clientSlug)
+  },
+})
+
+export const previewDocuments = query({
+  args: { clientSlug: v.string() },
+  handler: async (ctx, { clientSlug }) => {
+    await requireUser(ctx)
+    return listDocuments(ctx, clientSlug)
   },
 })
 
