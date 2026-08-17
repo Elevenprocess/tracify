@@ -111,7 +111,9 @@ export default defineSchema({
   documents: defineTable({
     clientSlug: v.string(),
     storageId: v.id('_storage'),
+    // Nom d'origine du fichier (avec extension) et nom affiché (renommable).
     fileName: v.string(),
+    name: v.optional(v.string()),
     mimeType: v.string(),
     size: v.number(),
     remark: v.string(),

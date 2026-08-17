@@ -21,6 +21,7 @@ export async function listDocuments(ctx: QueryCtx, clientSlug: string) {
     rows.map(async (d) => ({
       id: d._id,
       fileName: d.fileName,
+      name: d.name?.trim() || d.fileName,
       mimeType: d.mimeType,
       size: d.size,
       remark: d.remark,
@@ -56,6 +57,7 @@ export const create = mutation({
     mimeType: v.string(),
     size: v.number(),
     remark: v.string(),
+    name: v.optional(v.string()),
   },
   handler: async (ctx, a) => {
     await requireUser(ctx)
@@ -69,6 +71,7 @@ export const create = mutation({
       clientSlug: a.clientSlug,
       storageId: a.storageId,
       fileName: a.fileName,
+      name: a.name?.trim() || undefined,
       mimeType: a.mimeType || 'application/octet-stream',
       size: a.size,
       remark: a.remark.trim(),
@@ -77,11 +80,19 @@ export const create = mutation({
   },
 })
 
-export const setRemark = mutation({
-  args: { id: v.id('documents'), remark: v.string() },
-  handler: async (ctx, { id, remark }) => {
+// Renommer / changer la remarque
+export const update = mutation({
+  args: {
+    id: v.id('documents'),
+    name: v.optional(v.string()),
+    remark: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, name, remark }) => {
     await requireUser(ctx)
-    await ctx.db.patch(id, { remark: remark.trim() })
+    await ctx.db.patch(id, {
+      ...(name !== undefined ? { name: name.trim() || undefined } : {}),
+      ...(remark !== undefined ? { remark: remark.trim() } : {}),
+    })
   },
 })
 
