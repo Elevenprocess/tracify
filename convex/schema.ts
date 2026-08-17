@@ -117,6 +117,21 @@ export default defineSchema({
       v.literal('qualified'),
       v.literal('lost'),
     ),
+    // Arrivé automatiquement par le webhook (sinon saisie manuelle).
+    viaWebhook: v.optional(v.boolean()),
+    // Notes internes (admin) sur le prospect.
+    notes: v.optional(v.string()),
+    // Historique des changements de statut, du plus ancien au plus récent.
+    history: v.optional(
+      v.array(
+        v.object({
+          status: v.string(),
+          at: v.string(),
+          // 'admin' | 'client' (espace de suivi) | 'webhook'
+          by: v.optional(v.string()),
+        }),
+      ),
+    ),
     createdAt: v.string(),
   })
     .index('by_client', ['clientSlug'])

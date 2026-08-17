@@ -9,7 +9,7 @@ import { mutation, query } from './_generated/server'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import { requireUser } from './guard'
 import { buildCampaignDetail } from './meta'
-import { STATUS, toCard } from './prospects'
+import { STATUS, applyStatus, toPublicCard } from './prospects'
 
 // Alphabet sans caractères ambigus (pas de O/0, I/L/1) : facile à dicter.
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -112,49 +112,58 @@ export const check = query({
     (await clientSlugForCode(ctx, code)) !== null,
 })
 
-// Vue de suivi complète : le client et le détail de chacune de ses campagnes,
-// protégée uniquement par le code.
+// Corps de la vue de suivi : le client et le détail de chacune de ses
+// campagnes. Partagé entre l'accès par code et l'aperçu admin.
+async function buildTrackingView(ctx: QueryCtx, clientSlug: string) {
+  const client = await ctx.db
+    .query('clients')
+    .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+    .unique()
+  if (!client) return null
+
+  const campaigns = await ctx.db
+    .query('campaigns')
+    .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+    .collect()
+  const details = []
+  for (const c of campaigns) {
+    const detail = await buildCampaignDetail(ctx, c.metaId)
+    if (detail) details.push(detail)
+  }
+  details.sort((a, b) => b.totals.spend - a.totals.spend)
+
+  return {
+    client: { slug: client.slug, name: client.name },
+    campaigns: details,
+  }
+}
+
+// Prospects du client (toutes campagnes confondues), sans les notes internes.
+async function buildTrackingProspects(ctx: QueryCtx, clientSlug: string) {
+  const rows = await ctx.db
+    .query('prospects')
+    .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+    .collect()
+  return rows.sort((a, b) => b.date.localeCompare(a.date)).map(toPublicCard)
+}
+
+// Vue de suivi complète, protégée uniquement par le code.
 export const trackingView = query({
   args: { code: v.string() },
   handler: async (ctx, { code }) => {
     const clientSlug = await clientSlugForCode(ctx, code)
     if (!clientSlug) return null
-    const client = await ctx.db
-      .query('clients')
-      .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
-      .unique()
-    if (!client) return null
-
-    const campaigns = await ctx.db
-      .query('campaigns')
-      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
-      .collect()
-    const details = []
-    for (const c of campaigns) {
-      const detail = await buildCampaignDetail(ctx, c.metaId)
-      if (detail) details.push(detail)
-    }
-    details.sort((a, b) => b.totals.spend - a.totals.spend)
-
-    return {
-      client: { slug: client.slug, name: client.name },
-      campaigns: details,
-    }
+    return buildTrackingView(ctx, clientSlug)
   },
 })
 
-// Pipeline du client : ses prospects (toutes campagnes confondues), en
-// lecture + changement de statut, protégé uniquement par le code.
+// Pipeline du client : lecture + changement de statut, protégé par le code.
 export const trackingProspects = query({
   args: { code: v.string() },
   handler: async (ctx, { code }) => {
     const clientSlug = await clientSlugForCode(ctx, code)
     if (!clientSlug) return null
-    const rows = await ctx.db
-      .query('prospects')
-      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
-      .collect()
-    return rows.sort((a, b) => b.date.localeCompare(a.date)).map(toCard)
+    return buildTrackingProspects(ctx, clientSlug)
   },
 })
 
@@ -166,6 +175,26 @@ export const trackingSetStatus = mutation({
     const prospect = await ctx.db.get(id)
     if (!prospect || prospect.clientSlug !== clientSlug)
       throw new Error('Prospect introuvable.')
-    await ctx.db.patch(id, { status })
+    await applyStatus(ctx, id, status, 'client')
+  },
+})
+
+// --- Aperçu admin « voir comme le client » --------------------------------
+// Même vue que l'espace client, mais ouverte depuis la fiche client par un
+// membre connecté (aucun code nécessaire).
+
+export const previewView = query({
+  args: { clientSlug: v.string() },
+  handler: async (ctx, { clientSlug }) => {
+    await requireUser(ctx)
+    return buildTrackingView(ctx, clientSlug)
+  },
+})
+
+export const previewProspects = query({
+  args: { clientSlug: v.string() },
+  handler: async (ctx, { clientSlug }) => {
+    await requireUser(ctx)
+    return buildTrackingProspects(ctx, clientSlug)
   },
 })

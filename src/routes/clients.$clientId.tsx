@@ -8,11 +8,13 @@ import { CampaignBadge } from '../components/StatusBadge'
 import AppShell from '../components/AppShell'
 import CampaignsPanel from '../components/CampaignsPanel'
 import {
+  EyeIcon,
   TargetIcon,
   TrashIcon,
   UsersIcon,
   WalletIcon,
 } from '../components/icons'
+import AccountOverview from '../components/AccountOverview'
 import { EmptyState, PageHeader, PageSkeleton } from '../components/ui'
 import { formatDayRange, formatEuro, formatNumber } from '../lib/format'
 import RequireAuth from '../components/RequireAuth'
@@ -78,25 +80,43 @@ function ClientDetail() {
           </>
         }
         actions={
-          <button
-            type="button"
-            aria-label={`Supprimer ${client.name}`}
-            onClick={async () => {
-              if (
-                window.confirm(
-                  `Supprimer « ${client.name} » ? Ses campagnes, statistiques et créatives seront effacées de Tracify (rien n'est touché côté Meta).`,
-                )
-              ) {
-                await removeClient({ slug: client.slug })
-                navigate({ to: '/dashboard' })
-              }
-            }}
-            className="btn btn-danger btn-sm"
-          >
-            <TrashIcon className="h-3.5 w-3.5" />
-            Supprimer
-          </button>
+          <>
+            <Link
+              to="/suivi"
+              search={{ apercu: client.slug }}
+              target="_blank"
+              rel="noopener"
+              className="btn btn-secondary btn-sm"
+              title="Ouvre l'espace de suivi tel que le client le voit"
+            >
+              <EyeIcon className="h-3.5 w-3.5" />
+              Voir comme le client
+            </Link>
+            <button
+              type="button"
+              aria-label={`Supprimer ${client.name}`}
+              onClick={async () => {
+                if (
+                  window.confirm(
+                    `Supprimer « ${client.name} » ? Ses campagnes, statistiques et créatives seront effacées de Tracify (rien n'est touché côté Meta).`,
+                  )
+                ) {
+                  await removeClient({ slug: client.slug })
+                  navigate({ to: '/dashboard' })
+                }
+              }}
+              className="btn btn-danger btn-sm"
+            >
+              <TrashIcon className="h-3.5 w-3.5" />
+              Supprimer
+            </button>
+          </>
         }
+      />
+
+      <AccountOverview
+        account={client.account}
+        activeCampaigns={client.activeCampaigns}
       />
 
       <section className="mb-6">

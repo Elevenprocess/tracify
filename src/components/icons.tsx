@@ -226,3 +226,57 @@ export function AlertIcon({ className = 'h-4 w-4' }: IconProps) {
     </svg>
   )
 }
+
+export function XIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
+export function ClockIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </svg>
+  )
+}
+
+export function NoteIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+      <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+      <path d="M9 13h6" />
+      <path d="M9 17h4" />
+    </svg>
+  )
+}
+
+export function SparkleIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <path d="M12 3v3" />
+      <path d="M12 18v3" />
+      <path d="M3 12h3" />
+      <path d="M18 12h3" />
+      <path d="m5.6 5.6 2.1 2.1" />
+      <path d="m16.3 16.3 2.1 2.1" />
+      <path d="m5.6 18.4 2.1-2.1" />
+      <path d="m16.3 7.7 2.1-2.1" />
+    </svg>
+  )
+}
+
+export function ExternalLinkIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  )
+}

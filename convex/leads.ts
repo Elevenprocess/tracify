@@ -124,17 +124,20 @@ export const ingest = internalMutation({
     }
 
     const now = new Date()
+    const iso = now.toISOString()
     const id = await ctx.db.insert('prospects', {
       clientSlug: client.slug,
       campaignId,
       name: a.name.trim(),
       phone,
       email,
-      date: a.date?.slice(0, 10) || now.toISOString().slice(0, 10),
+      date: a.date?.slice(0, 10) || iso.slice(0, 10),
       source: a.source?.trim() || 'Webhook',
       medium: a.medium?.trim() || '—',
       status: 'new',
-      createdAt: now.toISOString(),
+      viaWebhook: true,
+      history: [{ status: 'new', at: iso, by: 'webhook' }],
+      createdAt: iso,
     })
     return { ok: true as const, id, duplicate: false }
   },
