@@ -169,9 +169,8 @@ export default function ClientOverview({
             ))}
           </ul>
           <p className="m-0 mt-3 text-xs text-[var(--sea-ink-soft)]">
-            Tous vos prospects sont dans le kanban ci-dessous ; chaque campagne
-            a aussi son onglet « Prospects ». Cliquez sur un nom pour ouvrir son
-            dossier.
+            Ouvrez une campagne, onglet « Prospects », pour traiter la liste en
+            kanban et consulter le dossier de chacun.
           </p>
         </article>
       </section>

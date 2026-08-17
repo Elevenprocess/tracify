@@ -174,6 +174,9 @@ function SuiviView({
   // null = vue d'ensemble, sinon l'ID Meta de la campagne ouverte
   const [selected, setSelected] = useState<string | null>(null)
   const [tab, setTab] = useState<ClientTab>('performance')
+  // Onglet Prospects : tous les prospects du client par défaut (la plupart ne
+  // sont pas rattachés à une campagne), filtre « cette campagne seulement ».
+  const [onlyThisCampaign, setOnlyThisCampaign] = useState(false)
   const quit = onQuit
 
   if (data === undefined) {
@@ -294,14 +297,6 @@ function SuiviView({
             prospects={prospects}
             onSelectCampaign={openCampaign}
           />
-          <PipelineBoard
-            title="Tous vos prospects"
-            prospects={prospects}
-            onSetStatus={onSetStatus}
-            onSaveClientNotes={onSaveClientNotes}
-            campaignNames={campaignNames}
-            emptyHint="Aucun prospect pour l'instant"
-          />
         </>
       ) : (
         <>
@@ -325,7 +320,7 @@ function SuiviView({
               <UsersIcon className="h-3.5 w-3.5" />
               Prospects
               <span className="tabular rounded-md bg-[var(--surface-strong)] px-1.5 py-0.5 text-[11px] font-bold">
-                {campaignProspects.length}
+                {prospects.length}
               </span>
             </TabButton>
           </div>
@@ -334,12 +329,34 @@ function SuiviView({
             <CampaignOverview data={campaign} compact />
           ) : (
             <PipelineBoard
-              title="Prospects de la campagne"
-              prospects={campaignProspects}
+              title={
+                onlyThisCampaign
+                  ? 'Prospects de la campagne'
+                  : 'Tous vos prospects'
+              }
+              prospects={onlyThisCampaign ? campaignProspects : prospects}
               onSetStatus={onSetStatus}
               onSaveClientNotes={onSaveClientNotes}
               campaignNames={campaignNames}
-              emptyHint="Aucun prospect pour cette campagne"
+              emptyHint={
+                onlyThisCampaign
+                  ? 'Aucun prospect pour cette campagne'
+                  : "Aucun prospect pour l'instant"
+              }
+              action={
+                <button
+                  type="button"
+                  aria-pressed={onlyThisCampaign}
+                  onClick={() => setOnlyThisCampaign((v) => !v)}
+                  className={`btn btn-sm ${onlyThisCampaign ? 'btn-primary' : 'btn-secondary'}`}
+                >
+                  <MegaphoneIcon className="h-3.5 w-3.5" />
+                  Cette campagne seulement
+                  <span className="tabular rounded-md bg-[rgba(0,0,0,0.15)] px-1.5 py-0.5 text-[11px] font-bold">
+                    {campaignProspects.length}
+                  </span>
+                </button>
+              }
             />
           )}
         </>
