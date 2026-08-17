@@ -216,6 +216,14 @@ export const remove = mutation({
     await Promise.all(
       [...daily, ...sources, ...prospects].map((r) => ctx.db.delete(r._id)),
     )
+    const documents = await ctx.db
+      .query('documents')
+      .withIndex('by_client', (q) => q.eq('clientSlug', slug))
+      .collect()
+    for (const d of documents) {
+      await ctx.storage.delete(d.storageId)
+      await ctx.db.delete(d._id)
+    }
     await ctx.db.delete(client._id)
   },
 })

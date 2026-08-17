@@ -13,6 +13,7 @@ import type * as auth from "../auth.js";
 import type * as clients from "../clients.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
+import type * as documents from "../documents.js";
 import type * as ghl from "../ghl.js";
 import type * as guard from "../guard.js";
 import type * as http from "../http.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   clients: typeof clients;
   crons: typeof crons;
   dashboard: typeof dashboard;
+  documents: typeof documents;
   ghl: typeof ghl;
   guard: typeof guard;
   http: typeof http;

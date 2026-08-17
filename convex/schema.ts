@@ -106,6 +106,18 @@ export default defineSchema({
     .index('by_code', ['code'])
     .index('by_client', ['clientSlug']),
 
+  // Dossier du client : fichiers déposés par l'équipe (devis, exports CSV,
+  // visuels, PDF…) avec une remarque affichée à la place du nom de fichier.
+  documents: defineTable({
+    clientSlug: v.string(),
+    storageId: v.id('_storage'),
+    fileName: v.string(),
+    mimeType: v.string(),
+    size: v.number(),
+    remark: v.string(),
+    createdAt: v.string(),
+  }).index('by_client', ['clientSlug']),
+
   prospects: defineTable({
     clientSlug: v.string(),
     // Campagne Meta à laquelle le prospect est rattaché (CRM par campagne)
