@@ -4,9 +4,15 @@ import { api } from '../../convex/_generated/api'
 import AppShell from '../components/AppShell'
 import CampaignOverview, { STATUS_LABELS } from '../components/CampaignOverview'
 import ProspectsBoard from '../components/ProspectsBoard'
-import { AlertIcon } from '../components/icons'
+import { AlertIcon, WebhookIcon } from '../components/icons'
 import RequireAuth from '../components/RequireAuth'
-import { EmptyState, PageHeader, PageSkeleton } from '../components/ui'
+import {
+  EmptyState,
+  PageHeader,
+  PageSkeleton,
+  SectionTitle,
+} from '../components/ui'
+import { WebhookCard } from '../components/AccessSection'
 
 export const Route = createFileRoute('/campagnes/$campaignId')({
   component: CampaignPage,
@@ -90,6 +96,15 @@ function CampaignDetail() {
       <CampaignOverview data={data} />
 
       <ProspectsBoard campaignId={data.metaId} />
+
+      {data.client && (
+        <section className="mt-8">
+          <SectionTitle icon={<WebhookIcon className="h-4 w-4" />}>
+            Recevoir les leads de cette campagne
+          </SectionTitle>
+          <WebhookCard clientSlug={data.client.slug} campaignId={data.metaId} />
+        </section>
+      )}
     </main>
   )
 }

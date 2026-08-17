@@ -116,7 +116,15 @@ export default function AccessSection({ clientSlug }: { clientSlug: string }) {
 
 // Clé du webhook d'entrée des leads : à coller dans n8n / GHL / Zapier pour
 // que les prospects du client arrivent directement dans son pipeline.
-function WebhookCard({ clientSlug }: { clientSlug: string }) {
+export function WebhookCard({
+  clientSlug,
+  campaignId,
+}: {
+  clientSlug: string
+  // Sur la page campagne : l'exemple est pré-rempli avec cet ID pour que
+  // les leads arrivent directement dans le CRM de la campagne.
+  campaignId?: string
+}) {
   const key = useQuery(api.leads.webhookKey, { clientSlug })
   const generate = useMutation(api.leads.generateWebhookKey)
   const revoke = useMutation(api.leads.revokeWebhookKey)
@@ -145,7 +153,7 @@ function WebhookCard({ clientSlug }: { clientSlug: string }) {
           phone: '0692 00 00 00',
           email: 'client@example.com',
           source: 'Meta Lead Form',
-          campaignId: '(optionnel) ID de campagne Meta',
+          campaignId: campaignId ?? '(optionnel) ID de campagne Meta',
         },
         null,
         2,
