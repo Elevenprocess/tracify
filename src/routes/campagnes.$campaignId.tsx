@@ -12,7 +12,7 @@ import {
   PageSkeleton,
   SectionTitle,
 } from '../components/ui'
-import { WebhookCard } from '../components/AccessSection'
+import { GhlCard, WebhookCard } from '../components/AccessSection'
 
 export const Route = createFileRoute('/campagnes/$campaignId')({
   component: CampaignPage,
@@ -100,9 +100,15 @@ function CampaignDetail() {
       {data.client && (
         <section className="mt-8">
           <SectionTitle icon={<WebhookIcon className="h-4 w-4" />}>
-            Recevoir les leads de cette campagne
+            Réception des leads de cette campagne
           </SectionTitle>
-          <WebhookCard clientSlug={data.client.slug} campaignId={data.metaId} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <WebhookCard
+              clientSlug={data.client.slug}
+              campaignId={data.metaId}
+            />
+            <GhlCard metaId={data.metaId} />
+          </div>
         </section>
       )}
     </main>

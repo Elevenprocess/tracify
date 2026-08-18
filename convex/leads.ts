@@ -109,6 +109,8 @@ export const ingest = internalMutation({
     }
 
     // Campagne facultative : ignorée si elle n'appartient pas au client.
+    // Sans campagne valable, le lead va dans la campagne active la plus
+    // récente du client (les prospects vivent dans les campagnes).
     let campaignId: string | undefined
     if (a.campaignId) {
       const campaign = await ctx.db
@@ -116,6 +118,19 @@ export const ingest = internalMutation({
         .withIndex('by_meta', (q) => q.eq('metaId', a.campaignId!))
         .unique()
       if (campaign?.clientSlug === client.slug) campaignId = campaign.metaId
+    }
+    if (!campaignId) {
+      const campaigns = await ctx.db
+        .query('campaigns')
+        .withIndex('by_client', (q) => q.eq('clientSlug', client.slug))
+        .collect()
+      const pick =
+        campaigns
+          .filter((c) => !c.status || c.status === 'ACTIVE')
+          .sort((x, y) => y.createdAt.localeCompare(x.createdAt))
+          .at(0) ??
+        campaigns.sort((x, y) => y.createdAt.localeCompare(x.createdAt)).at(0)
+      campaignId = pick?.metaId
     }
 
     // Anti-doublon : même téléphone ou email déjà présent chez ce client.

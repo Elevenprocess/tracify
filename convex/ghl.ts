@@ -1,7 +1,8 @@
 /**
- * Synchro GoHighLevel → Tracify : les nouveaux contacts du sous-compte GHL
- * d'un client sont récupérés toutes les 10 min (API contacts/search, filtre
- * dateAdded) et déposés dans son pipeline, sans rien configurer côté GHL.
+ * Synchro GoHighLevel → Tracify : chaque campagne peut être rattachée à un
+ * sous-compte GHL ; ses nouveaux contacts sont récupérés toutes les 10 min
+ * (API contacts/search, filtre dateAdded) et déposés dans le CRM de la
+ * campagne, sans rien configurer côté GHL.
  * Token d'intégration privée (PIT) dans l'env Convex :
  *   GHL_PRIVATE_INTEGRATION_TOKEN (par défaut) ou GHL_TOKEN_<locationId>.
  */
@@ -12,7 +13,9 @@ import {
   internalMutation,
   internalQuery,
   mutation,
+  query,
 } from './_generated/server'
+import type { MutationCtx, QueryCtx } from './_generated/server'
 import { internal } from './_generated/api'
 import { requireUser } from './guard'
 import { findDuplicate } from './prospects'
@@ -123,63 +126,126 @@ async function searchContacts(
   }
 }
 
-// --- Côté admin -------------------------------------------------------------
+// --- Côté admin (page campagne) --------------------------------------------
 
-// Rattache (ou détache avec une chaîne vide) le sous-compte GHL d'un client.
+async function campaignByMeta(
+  ctx: { db: MutationCtx['db'] } | { db: QueryCtx['db'] },
+  metaId: string,
+) {
+  return await ctx.db
+    .query('campaigns')
+    .withIndex('by_meta', (q) => q.eq('metaId', metaId))
+    .unique()
+}
+
+// État de la synchro d'une campagne + nombre de prospects venus de GHL.
+export const campaignStatus = query({
+  args: { metaId: v.string() },
+  handler: async (ctx, { metaId }) => {
+    await requireUser(ctx)
+    const campaign = await campaignByMeta(ctx, metaId)
+    if (!campaign) return null
+    const prospects = await ctx.db
+      .query('prospects')
+      .withIndex('by_campaign', (q) => q.eq('campaignId', metaId))
+      .collect()
+    return {
+      ghl: campaign.ghlLocationId
+        ? {
+            locationId: campaign.ghlLocationId,
+            lastSyncAt: campaign.ghlLastSyncAt ?? null,
+            error: campaign.ghlSyncError ?? null,
+          }
+        : null,
+      fromGhl: prospects.filter((p) => p.ghlContactId).length,
+    }
+  },
+})
+
+async function patchLocation(
+  ctx: MutationCtx,
+  metaId: string,
+  locationId: string,
+) {
+  const campaign = await campaignByMeta(ctx, metaId)
+  if (!campaign) throw new Error('Campagne introuvable.')
+  await ctx.db.patch(campaign._id, {
+    ghlLocationId: locationId.trim() || undefined,
+    ghlLastSyncAt: undefined,
+    ghlSyncError: undefined,
+  })
+}
+
+// Rattache (ou détache avec une chaîne vide) le sous-compte GHL d'une campagne.
 export const setLocation = mutation({
-  args: { clientSlug: v.string(), locationId: v.string() },
-  handler: async (ctx, { clientSlug, locationId }) => {
+  args: { metaId: v.string(), locationId: v.string() },
+  handler: async (ctx, { metaId, locationId }) => {
     await requireUser(ctx)
-    const client = await ctx.db
-      .query('clients')
-      .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
-      .unique()
-    if (!client) throw new Error('Client introuvable.')
-    const id = locationId.trim()
-    await ctx.db.patch(client._id, {
-      ghlLocationId: id || undefined,
-      ghlLastSyncAt: undefined,
-      ghlSyncError: undefined,
-    })
+    await patchLocation(ctx, metaId, locationId)
   },
 })
 
-// Outil CLI : `npx convex run ghl:setLocationCli '{"clientSlug":"…","locationId":"…"}'`
+// Outil CLI : `npx convex run ghl:setLocationCli '{"metaId":"…","locationId":"…"}'`
 export const setLocationCli = internalMutation({
-  args: { clientSlug: v.string(), locationId: v.string() },
-  handler: async (ctx, { clientSlug, locationId }) => {
+  args: { metaId: v.string(), locationId: v.string() },
+  handler: async (ctx, { metaId, locationId }) => {
+    await patchLocation(ctx, metaId, locationId)
+  },
+})
+
+// Migration 18/08 : rattache à une campagne les prospects du client qui n'en
+// ont pas (leads GHL/webhook arrivés avant la synchro par campagne).
+export const attachUnassignedCli = internalMutation({
+  args: { clientSlug: v.string(), metaId: v.string() },
+  handler: async (ctx, { clientSlug, metaId }) => {
+    const campaign = await campaignByMeta(ctx, metaId)
+    if (!campaign || campaign.clientSlug !== clientSlug)
+      throw new Error('Campagne introuvable pour ce client.')
+    const rows = await ctx.db
+      .query('prospects')
+      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+      .collect()
+    let n = 0
+    for (const p of rows) {
+      if (p.campaignId) continue
+      await ctx.db.patch(p._id, { campaignId: metaId })
+      n++
+    }
+    // Nettoyage de l'ancien rattachement client.
     const client = await ctx.db
       .query('clients')
       .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
       .unique()
-    if (!client) throw new Error('Client introuvable.')
-    await ctx.db.patch(client._id, {
-      ghlLocationId: locationId.trim() || undefined,
-      ghlLastSyncAt: undefined,
-      ghlSyncError: undefined,
-    })
+    if (client?.ghlLocationId)
+      await ctx.db.patch(client._id, {
+        ghlLocationId: undefined,
+        ghlLastSyncAt: undefined,
+        ghlSyncError: undefined,
+      })
+    return { attached: n }
   },
 })
 
-// Bouton « Synchroniser maintenant » sur la fiche client.
+// Bouton « Synchroniser maintenant » sur la page campagne.
 export const syncNow = action({
-  args: { clientSlug: v.string() },
-  handler: async (ctx, { clientSlug }): Promise<SyncResult> => {
+  args: { metaId: v.string() },
+  handler: async (ctx, { metaId }): Promise<SyncResult> => {
     await requireUser(ctx)
-    return await ctx.runAction(internal.ghl.syncClient, { clientSlug })
+    return await ctx.runAction(internal.ghl.syncCampaign, { metaId })
   },
 })
 
 // --- Synchro ---------------------------------------------------------------
 
-export const clientsWithGhl = internalQuery({
+export const campaignsWithGhl = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const clients = await ctx.db.query('clients').collect()
-    return clients
+    const campaigns = await ctx.db.query('campaigns').collect()
+    return campaigns
       .filter((c) => c.ghlLocationId)
       .map((c) => ({
-        slug: c.slug,
+        metaId: c.metaId,
+        clientSlug: c.clientSlug,
         locationId: c.ghlLocationId!,
         lastSyncAt: c.ghlLastSyncAt ?? null,
       }))
@@ -188,17 +254,14 @@ export const clientsWithGhl = internalQuery({
 
 export const markSync = internalMutation({
   args: {
-    clientSlug: v.string(),
+    metaId: v.string(),
     at: v.string(),
     error: v.optional(v.string()),
   },
-  handler: async (ctx, { clientSlug, at, error }) => {
-    const client = await ctx.db
-      .query('clients')
-      .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
-      .unique()
-    if (!client) return
-    await ctx.db.patch(client._id, {
+  handler: async (ctx, { metaId, at, error }) => {
+    const campaign = await campaignByMeta(ctx, metaId)
+    if (!campaign) return
+    await ctx.db.patch(campaign._id, {
       // En cas d'erreur on garde l'ancien curseur pour ré-essayer la fenêtre.
       ...(error ? {} : { ghlLastSyncAt: at }),
       ghlSyncError: error,
@@ -206,11 +269,12 @@ export const markSync = internalMutation({
   },
 })
 
-// Dépose un contact GHL dans le pipeline (idempotent : ID GHL, puis
-// téléphone/email). Retourne 'inserted' | 'duplicate' | 'skipped'.
+// Dépose un contact GHL dans le CRM de la campagne (idempotent : ID GHL,
+// puis téléphone/email). Retourne 'inserted' | 'duplicate'.
 export const upsertContact = internalMutation({
   args: {
     clientSlug: v.string(),
+    metaId: v.string(),
     contact: v.object({
       id: v.string(),
       name: v.string(),
@@ -219,10 +283,11 @@ export const upsertContact = internalMutation({
       dateAdded: v.string(),
       source: v.string(),
       medium: v.string(),
-      campaignId: v.optional(v.string()),
+      // Campagne Meta indiquée par l'attribution GHL (lead ads), si connue
+      attributedCampaignId: v.optional(v.string()),
     }),
   },
-  handler: async (ctx, { clientSlug, contact }) => {
+  handler: async (ctx, { clientSlug, metaId, contact }) => {
     const known = await ctx.db
       .query('prospects')
       .withIndex('by_ghl', (q) => q.eq('ghlContactId', contact.id))
@@ -236,22 +301,24 @@ export const upsertContact = internalMutation({
       contact.email,
     )
     if (dup) {
-      if (!dup.ghlContactId)
-        await ctx.db.patch(dup._id, { ghlContactId: contact.id })
+      const patch: { ghlContactId?: string; campaignId?: string } = {}
+      if (!dup.ghlContactId) patch.ghlContactId = contact.id
+      if (!dup.campaignId) patch.campaignId = metaId
+      if (Object.keys(patch).length) await ctx.db.patch(dup._id, patch)
       return 'duplicate' as const
     }
 
-    // Campagne Meta rattachée seulement si elle appartient au client.
-    let campaignId: string | undefined
-    if (contact.campaignId) {
-      const campaign = await ctx.db
-        .query('campaigns')
-        .withIndex('by_meta', (q) => q.eq('metaId', contact.campaignId!))
-        .unique()
-      if (campaign?.clientSlug === clientSlug) campaignId = campaign.metaId
+    // Par défaut le lead va dans la campagne synchronisée ; si l'attribution
+    // GHL désigne une autre campagne du même client, on la respecte.
+    let campaignId = metaId
+    if (
+      contact.attributedCampaignId &&
+      contact.attributedCampaignId !== metaId
+    ) {
+      const other = await campaignByMeta(ctx, contact.attributedCampaignId)
+      if (other?.clientSlug === clientSlug) campaignId = other.metaId
     }
 
-    const now = new Date().toISOString()
     await ctx.db.insert('prospects', {
       clientSlug,
       campaignId,
@@ -266,7 +333,7 @@ export const upsertContact = internalMutation({
       ghlContactId: contact.id,
       history: [{ status: 'new', at: contact.dateAdded, by: 'ghl' }],
       // Date d'arrivée réelle chez GHL (sert au badge « nouveau »).
-      createdAt: contact.dateAdded || now,
+      createdAt: contact.dateAdded,
     })
     return 'inserted' as const
   },
@@ -281,20 +348,20 @@ export interface SyncResult {
   error?: string
 }
 
-export const syncClient = internalAction({
-  args: { clientSlug: v.string() },
-  handler: async (ctx, { clientSlug }): Promise<SyncResult> => {
-    const clients = await ctx.runQuery(internal.ghl.clientsWithGhl, {})
-    const client = clients.find((c) => c.slug === clientSlug)
+export const syncCampaign = internalAction({
+  args: { metaId: v.string() },
+  handler: async (ctx, { metaId }): Promise<SyncResult> => {
+    const campaigns = await ctx.runQuery(internal.ghl.campaignsWithGhl, {})
+    const campaign = campaigns.find((c) => c.metaId === metaId)
     const empty = { inserted: 0, duplicates: 0, skipped: 0, scanned: 0 }
-    if (!client)
+    if (!campaign)
       return { ok: false, ...empty, error: 'Aucun sous-compte GHL rattaché.' }
 
-    const token = tokenFor(client.locationId)
+    const token = tokenFor(campaign.locationId)
     if (!token) {
       const error = 'Token GHL manquant (GHL_PRIVATE_INTEGRATION_TOKEN).'
       await ctx.runMutation(internal.ghl.markSync, {
-        clientSlug,
+        metaId,
         at: new Date().toISOString(),
         error,
       })
@@ -302,8 +369,8 @@ export const syncClient = internalAction({
     }
 
     const startedAt = new Date().toISOString()
-    const since = client.lastSyncAt
-      ? new Date(Date.parse(client.lastSyncAt) - OVERLAP_MS)
+    const since = campaign.lastSyncAt
+      ? new Date(Date.parse(campaign.lastSyncAt) - OVERLAP_MS)
       : new Date(Date.now() - INITIAL_WINDOW_MS)
 
     const counts = { ...empty }
@@ -312,7 +379,7 @@ export const syncClient = internalAction({
       for (let page = 0; page < MAX_PAGES; page++) {
         const { contacts } = await searchContacts(
           token,
-          client.locationId,
+          campaign.locationId,
           since.toISOString(),
           searchAfter,
         )
@@ -344,7 +411,8 @@ export const syncClient = internalAction({
             str(c.source) || undefined,
           )
           const result = await ctx.runMutation(internal.ghl.upsertContact, {
-            clientSlug,
+            clientSlug: campaign.clientSlug,
+            metaId,
             contact: {
               id: c.id,
               name,
@@ -353,7 +421,7 @@ export const syncClient = internalAction({
               dateAdded: str(c.dateAdded) || startedAt,
               source,
               medium,
-              campaignId: str(attr.campaignId) || undefined,
+              attributedCampaignId: str(attr.campaignId) || undefined,
             },
           })
           if (result === 'inserted') counts.inserted++
@@ -363,15 +431,12 @@ export const syncClient = internalAction({
         searchAfter = contacts[contacts.length - 1]?.searchAfter
         if (!searchAfter) break
       }
-      await ctx.runMutation(internal.ghl.markSync, {
-        clientSlug,
-        at: startedAt,
-      })
+      await ctx.runMutation(internal.ghl.markSync, { metaId, at: startedAt })
       return { ok: true, ...counts }
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err)
       await ctx.runMutation(internal.ghl.markSync, {
-        clientSlug,
+        metaId,
         at: startedAt,
         error,
       })
@@ -380,13 +445,13 @@ export const syncClient = internalAction({
   },
 })
 
-// Cron : tous les clients rattachés à un sous-compte GHL.
+// Cron : toutes les campagnes rattachées à un sous-compte GHL.
 export const syncAll = internalAction({
   args: {},
   handler: async (ctx) => {
-    const clients = await ctx.runQuery(internal.ghl.clientsWithGhl, {})
-    for (const c of clients) {
-      await ctx.runAction(internal.ghl.syncClient, { clientSlug: c.slug })
+    const campaigns = await ctx.runQuery(internal.ghl.campaignsWithGhl, {})
+    for (const c of campaigns) {
+      await ctx.runAction(internal.ghl.syncCampaign, { metaId: c.metaId })
     }
   },
 })

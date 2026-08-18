@@ -270,13 +270,23 @@ export const client = query({
         lastSyncAt: lastSync,
         hasAccessCode: accessCodes.some((c) => !c.revokedAt),
         hasWebhook: Boolean(client.webhookKey),
-        ghl: client.ghlLocationId
-          ? {
-              locationId: client.ghlLocationId,
-              lastSyncAt: client.ghlLastSyncAt ?? null,
-              error: client.ghlSyncError ?? null,
-            }
-          : null,
+        // Synchro GHL : rattachée par campagne — on résume au niveau du compte
+        ghl: (() => {
+          const linked = campaigns.filter((c) => c.ghlLocationId)
+          if (linked.length === 0) return null
+          const last = linked.reduce<string | null>(
+            (m, c) =>
+              c.ghlLastSyncAt && (m === null || c.ghlLastSyncAt > m)
+                ? c.ghlLastSyncAt
+                : m,
+            null,
+          )
+          return {
+            locationId: linked.map((c) => c.ghlLocationId!).join(', '),
+            lastSyncAt: last,
+            error: linked.find((c) => c.ghlSyncError)?.ghlSyncError ?? null,
+          }
+        })(),
         fromGhl: prospects.filter((p) => p.ghlContactId).length,
         campaigns: campaigns
           .map((c) => ({

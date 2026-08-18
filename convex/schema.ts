@@ -26,8 +26,8 @@ export default defineSchema({
     activeCampaigns: v.optional(v.number()),
     // Clé secrète du webhook d'entrée des leads (POST /api/leads).
     webhookKey: v.optional(v.string()),
-    // Sous-compte GoHighLevel : ses nouveaux contacts sont récupérés
-    // automatiquement (synchro toutes les 10 min) dans le pipeline.
+    // Ancien rattachement GHL au niveau client (déplacé sur les campagnes
+    // le 18/08) — conservé pour les données existantes, plus utilisé.
     ghlLocationId: v.optional(v.string()),
     ghlLastSyncAt: v.optional(v.string()),
     ghlSyncError: v.optional(v.string()),
@@ -45,6 +45,11 @@ export default defineSchema({
     status: v.optional(v.string()),
     lastSyncedAt: v.optional(v.string()),
     syncError: v.optional(v.string()),
+    // Sous-compte GoHighLevel rattaché à la campagne : ses nouveaux contacts
+    // sont récupérés toutes les 10 min et déposés dans le CRM de la campagne.
+    ghlLocationId: v.optional(v.string()),
+    ghlLastSyncAt: v.optional(v.string()),
+    ghlSyncError: v.optional(v.string()),
     createdAt: v.string(),
   })
     .index('by_client', ['clientSlug'])

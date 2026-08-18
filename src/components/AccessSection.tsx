@@ -24,19 +24,7 @@ const WEBHOOK_URL = `${(
 
 // Code d'accès client : généré sur la fiche client, saisi par le client sur
 // la page de connexion pour ouvrir le suivi public de ses campagnes.
-export default function AccessSection({
-  clientSlug,
-  ghl,
-  fromGhl = 0,
-}: {
-  clientSlug: string
-  ghl?: {
-    locationId: string
-    lastSyncAt: string | null
-    error: string | null
-  } | null
-  fromGhl?: number
-}) {
+export default function AccessSection({ clientSlug }: { clientSlug: string }) {
   const current = useQuery(api.access.codeForClient, { clientSlug })
   const generate = useMutation(api.access.generate)
   const revoke = useMutation(api.access.revoke)
@@ -129,29 +117,33 @@ export default function AccessSection({
           )}
         </article>
 
-        <WebhookCard clientSlug={clientSlug} />
-        <GhlCard clientSlug={clientSlug} ghl={ghl ?? null} fromGhl={fromGhl} />
+        <article className="island-shell rise-in flex flex-col rounded-2xl p-5">
+          <h3 className="m-0 flex items-center gap-2 text-sm font-bold text-[var(--sea-ink)]">
+            <WebhookIcon className="h-4 w-4 text-[var(--lagoon)]" />
+            Réception des leads
+          </h3>
+          <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+            Le webhook et la synchro GoHighLevel se règlent{' '}
+            <strong className="text-[var(--sea-ink)]">
+              sur la page de chaque campagne
+            </strong>{' '}
+            (section « Réception des leads ») : les prospects arrivent
+            directement dans le CRM de la campagne concernée.
+          </p>
+        </article>
       </div>
     </section>
   )
 }
 
-// Synchro GoHighLevel : on renseigne l'ID du sous-compte (Location ID) et
-// Tracify récupère ses nouveaux contacts toutes les 10 min — aucun réglage
-// côté GHL. Bouton pour lancer une synchro immédiate.
-export function GhlCard({
-  clientSlug,
-  ghl,
-  fromGhl,
-}: {
-  clientSlug: string
-  ghl: {
-    locationId: string
-    lastSyncAt: string | null
-    error: string | null
-  } | null
-  fromGhl: number
-}) {
+// Synchro GoHighLevel d'une campagne : on renseigne l'ID du sous-compte
+// (Location ID) et Tracify récupère ses nouveaux contacts toutes les 10 min
+// dans le CRM de la campagne — aucun réglage côté GHL. Bouton pour lancer
+// une synchro immédiate.
+export function GhlCard({ metaId }: { metaId: string }) {
+  const status = useQuery(api.ghl.campaignStatus, { metaId })
+  const ghl = status?.ghl ?? null
+  const fromGhl = status?.fromGhl ?? 0
   const setLocation = useMutation(api.ghl.setLocation)
   const syncNow = useAction(api.ghl.syncNow)
   const [value, setValue] = useState('')
@@ -164,7 +156,7 @@ export function GhlCard({
     if (pending) return
     setPending(true)
     try {
-      await setLocation({ clientSlug, locationId: value })
+      await setLocation({ metaId, locationId: value })
       setEditing(false)
       setValue('')
       setResult(null)
@@ -178,7 +170,7 @@ export function GhlCard({
     setPending(true)
     setResult(null)
     try {
-      const r = await syncNow({ clientSlug })
+      const r = await syncNow({ metaId })
       setResult(
         r.ok
           ? `${formatNumber(r.inserted)} nouveau${r.inserted > 1 ? 'x' : ''} prospect${r.inserted > 1 ? 's' : ''} · ${formatNumber(r.duplicates)} déjà connu${r.duplicates > 1 ? 's' : ''}${r.skipped ? ` · ${formatNumber(r.skipped)} sans coordonnées ignoré${r.skipped > 1 ? 's' : ''}` : ''}`
@@ -190,7 +182,7 @@ export function GhlCard({
   }
 
   return (
-    <article className="island-shell rise-in flex flex-col rounded-2xl p-5 lg:col-span-2">
+    <article className="island-shell rise-in flex flex-col rounded-2xl p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="m-0 flex items-center gap-2 text-sm font-bold text-[var(--sea-ink)]">
@@ -198,10 +190,10 @@ export function GhlCard({
             Synchro GoHighLevel
           </h3>
           <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
-            Rattache le sous-compte GHL du client : ses nouveaux contacts sont
-            récupérés automatiquement toutes les 10 min (téléphone/email requis,
-            doublons ignorés), avec leur provenance (pub Facebook, simulateur,
-            saisie…). Rien à configurer côté GHL.
+            Rattache un sous-compte GHL à cette campagne : ses nouveaux contacts
+            sont récupérés automatiquement toutes les 10 min dans ce CRM
+            (téléphone/email requis, doublons ignorés), avec leur provenance
+            (pub Facebook, simulateur, saisie…). Rien à configurer côté GHL.
           </p>
         </div>
         {ghl && !editing && (

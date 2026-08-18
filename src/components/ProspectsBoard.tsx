@@ -110,32 +110,6 @@ export default function ProspectsBoard({
   )
 }
 
-// Kanban admin de tous les prospects d'un client (toutes campagnes, y compris
-// ceux arrivés par le webhook sans campagne).
-export function ClientProspectsBoard({ clientSlug }: { clientSlug: string }) {
-  const live = useQuery(api.prospects.byClient, { clientSlug })
-  const campaigns = useQuery(api.meta.campaignsByClient, { clientSlug })
-  const setStatus = useMutation(api.prospects.setStatus)
-  const setNotes = useMutation(api.prospects.setNotes)
-  const setClientNotes = useMutation(api.prospects.setClientNotes)
-  const removeProspect = useMutation(api.prospects.remove)
-  const campaignNames: Record<string, string> = {}
-  for (const c of campaigns ?? [])
-    campaignNames[c.metaId] = c.name ?? `Campagne ${c.metaId}`
-  return (
-    <PipelineBoard
-      title="Pipeline prospects"
-      prospects={live ?? []}
-      campaignNames={campaignNames}
-      linkCampaigns
-      onSetStatus={(id, status) => setStatus({ id, status })}
-      onSaveNotes={(id, notes) => setNotes({ id, notes })}
-      onSaveClientNotes={(id, notes) => setClientNotes({ id, notes })}
-      onRemove={(id) => removeProspect({ id })}
-    />
-  )
-}
-
 // Kanban générique : la source des données et les actions sont injectées,
 // ce qui permet de le réutiliser dans l'espace client (accès par code).
 export function PipelineBoard({
