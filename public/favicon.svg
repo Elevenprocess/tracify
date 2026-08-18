@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#60d7cf" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#60d7cf" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#070f12"/>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#60d7cf" stroke-opacity="0.18"/>
+  <!-- T -->
+  <path d="M16 18h32v9H37v21h-10V27H16z" fill="#60d7cf"/>
+  <!-- point lumineux du logo -->
+  <circle cx="47" cy="47" r="9" fill="url(#glow)"/>
+  <circle cx="47" cy="47" r="4.2" fill="#60d7cf"/>
+</svg>
