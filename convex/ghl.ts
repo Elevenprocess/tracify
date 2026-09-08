@@ -149,9 +149,12 @@ async function searchContacts(
   })
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok) {
-    throw new Error(
-      `GHL ${res.status} : ${str(data.message) || str(data.error) || 'erreur inconnue'}`,
-    )
+    const message = str(data.message) || str(data.error) || 'erreur inconnue'
+    if (res.status === 403 || res.status === 401)
+      throw new Error(
+        `Le token GHL n'a pas accès à ce sous-compte (${res.status}). Crée une intégration privée dans ce sous-compte (Paramètres → Intégrations privées, scope Contacts lecture) et enregistre-la dans Convex sous GHL_TOKEN_${locationId}.`,
+      )
+    throw new Error(`GHL ${res.status} : ${message}`)
   }
   return {
     contacts: Array.isArray(data.contacts)
