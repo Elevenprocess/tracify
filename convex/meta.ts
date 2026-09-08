@@ -293,18 +293,22 @@ export const listAllCampaigns = internalMutation({
       id: c._id,
       clientSlug: c.clientSlug,
       metaId: c.metaId,
+      origin: c.origin,
     }))
   },
 })
 
 // Sync d'une campagne : nom + statut + stats quotidiennes sur 30 jours.
+const ORIGIN = v.optional(v.union(v.literal('meta'), v.literal('ghl')))
+
 export const syncCampaign = internalAction({
   args: {
     id: v.id('campaigns'),
     clientSlug: v.string(),
     metaId: v.string(),
+    origin: ORIGIN,
   },
-  handler: async (ctx, { id, clientSlug, metaId }) => {
+  handler: async (ctx, { id, clientSlug, metaId, origin }) => {
     const now = new Date()
     const to = now.toISOString().slice(0, 10)
     const from = new Date(now.getTime() - SYNC_WINDOW_DAYS * 86_400_000)
@@ -353,9 +357,13 @@ export const syncCampaign = internalAction({
       console.log(`Sync ${metaId} (${clientSlug}) : ${rows.length} jours`)
     } catch (e) {
       const raw = String(e)
-      const friendly = /does not exist|missing permissions/i.test(raw)
-        ? "Campagne introuvable ou inaccessible avec le token Meta — vérifie l'ID dans le Gestionnaire de publicités."
-        : raw.slice(0, 300)
+      const inaccessible = /does not exist|missing permissions/i.test(raw)
+      const friendly =
+        inaccessible && origin === 'ghl'
+          ? 'Statistiques Meta indisponibles : campagne détectée via GoHighLevel, hors des comptes accessibles avec le token Meta (les prospects sont bien reçus).'
+          : inaccessible
+            ? "Campagne introuvable ou inaccessible avec le token Meta — vérifie l'ID dans le Gestionnaire de publicités."
+            : raw.slice(0, 300)
       await ctx.runMutation(internal.meta.patchCampaign, {
         id,
         lastSyncedAt: now.toISOString(),
@@ -507,6 +515,7 @@ export const campaignsByClient = query({
         status: c.status ?? null,
         lastSyncedAt: c.lastSyncedAt ?? null,
         syncError: c.syncError ?? null,
+        origin: c.origin ?? null,
       }))
       .sort((a, b) => (a.name ?? a.metaId).localeCompare(b.name ?? b.metaId))
   },

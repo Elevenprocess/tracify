@@ -1,7 +1,11 @@
 /**
- * Entrée des leads : un webhook par client (POST /api/leads, clé secrète)
- * pour pousser les prospects depuis n8n, GHL, un formulaire Meta… Les leads
- * atterrissent dans le pipeline du client (fiche admin + espace client).
+ * Entrée des leads : un webhook par client (POST /api/leads, clé secrète),
+ * conçu pour l'action « Webhook » d'un workflow GoHighLevel (mais utilisable
+ * depuis n8n, Zapier…). Chaque lead est rangé dans la campagne Meta de son
+ * attribution GHL — créée dans Tracify si elle est nouvelle — et jamais dans
+ * une autre campagne ; sans campagne il est ignoré (voir convex/routing.ts).
+ * Si le payload GHL n'embarque pas l'attribution, la fiche contact est relue
+ * par l'API GHL (contact_id) avant l'aiguillage.
  */
 import { v } from 'convex/values'
 import {
@@ -11,9 +15,17 @@ import {
   query,
 } from './_generated/server'
 import { internal } from './_generated/api'
+import type { Doc } from './_generated/dataModel'
+import type { MutationCtx } from './_generated/server'
 import { requireUser } from './guard'
 import { findDuplicate } from './prospects'
-import { describeAttribution } from './ghl'
+import {
+  attributedCampaign,
+  describeAttribution,
+  fetchContact,
+  tokenFor,
+} from './ghl'
+import { routeToCampaign } from './routing'
 
 const KEY_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'
 function randomKey(len = 32) {
@@ -34,6 +46,38 @@ export const webhookKey = query({
       .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
       .unique()
     return client?.webhookKey ?? null
+  },
+})
+
+// État du branchement GHL : dernière réception, compteurs, campagnes
+// détectées automatiquement — affiché sur la fiche client.
+export const webhookStatus = query({
+  args: { clientSlug: v.string() },
+  handler: async (ctx, { clientSlug }) => {
+    await requireUser(ctx)
+    const client = await ctx.db
+      .query('clients')
+      .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+      .unique()
+    if (!client) return null
+    const campaigns = await ctx.db
+      .query('campaigns')
+      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+      .collect()
+    return {
+      key: client.webhookKey ?? null,
+      lastAt: client.webhookLastAt ?? null,
+      lastOutcome: client.webhookLastOutcome ?? null,
+      counts: client.webhookCounts ?? {
+        received: 0,
+        imported: 0,
+        duplicates: 0,
+        noCampaign: 0,
+      },
+      detected: campaigns
+        .filter((c) => c.origin === 'ghl')
+        .map((c) => ({ metaId: c.metaId, name: c.name ?? null })),
+    }
   },
 })
 
@@ -80,6 +124,43 @@ export const setWebhookKey = internalMutation({
 
 // --- Réception ---------------------------------------------------------------
 
+type Outcome = 'imported' | 'duplicate' | 'no-campaign' | 'other-client'
+
+const OUTCOME_LABEL: Record<Outcome, string> = {
+  imported: 'prospect ajouté',
+  duplicate: 'déjà connu',
+  'no-campaign': 'ignoré : aucune campagne Meta dans son attribution',
+  'other-client': 'ignoré : campagne rattachée à un autre client',
+}
+
+async function recordWebhook(
+  ctx: MutationCtx,
+  client: Doc<'clients'>,
+  outcome: Outcome,
+  detail?: string,
+) {
+  const c = client.webhookCounts ?? {
+    received: 0,
+    imported: 0,
+    duplicates: 0,
+    noCampaign: 0,
+  }
+  await ctx.db.patch(client._id, {
+    webhookLastAt: new Date().toISOString(),
+    webhookLastOutcome: detail
+      ? `${OUTCOME_LABEL[outcome]} (${detail})`
+      : OUTCOME_LABEL[outcome],
+    webhookCounts: {
+      received: c.received + 1,
+      imported: c.imported + (outcome === 'imported' ? 1 : 0),
+      duplicates: c.duplicates + (outcome === 'duplicate' ? 1 : 0),
+      noCampaign:
+        c.noCampaign +
+        (outcome === 'no-campaign' || outcome === 'other-client' ? 1 : 0),
+    },
+  })
+}
+
 export const ingest = internalMutation({
   args: {
     key: v.string(),
@@ -88,7 +169,9 @@ export const ingest = internalMutation({
     email: v.optional(v.string()),
     source: v.optional(v.string()),
     medium: v.optional(v.string()),
+    // ID de campagne Meta (attribution GHL ou champ explicite) + son nom
     campaignId: v.optional(v.string()),
+    campaignName: v.optional(v.string()),
     date: v.optional(v.string()),
     ghlContactId: v.optional(v.string()),
   },
@@ -99,52 +182,60 @@ export const ingest = internalMutation({
       .unique()
     if (!client) return { ok: false as const, error: 'Clé invalide.' }
 
+    const name = a.name.trim()
+
     // Déjà reçu (même contact GHL) → rien à faire.
     if (a.ghlContactId) {
       const known = await ctx.db
         .query('prospects')
         .withIndex('by_ghl', (q) => q.eq('ghlContactId', a.ghlContactId))
         .first()
-      if (known) return { ok: true as const, id: known._id, duplicate: true }
+      if (known) {
+        await recordWebhook(ctx, client, 'duplicate', name)
+        return { ok: true as const, id: known._id, duplicate: true }
+      }
     }
 
-    // Campagne facultative : ignorée si elle n'appartient pas au client.
-    // Sans campagne valable, le lead va dans la campagne active la plus
-    // récente du client (les prospects vivent dans les campagnes).
-    let campaignId: string | undefined
-    if (a.campaignId) {
-      const campaign = await ctx.db
-        .query('campaigns')
-        .withIndex('by_meta', (q) => q.eq('metaId', a.campaignId!))
-        .unique()
-      if (campaign?.clientSlug === client.slug) campaignId = campaign.metaId
+    // Aiguillage strict : la campagne de l'attribution, créée si nouvelle ;
+    // sans campagne (ou campagne d'un autre client) le lead n'est pas importé.
+    const routed = await routeToCampaign(
+      ctx,
+      client.slug,
+      a.campaignId,
+      a.campaignName,
+    )
+    if (routed.kind !== 'campaign') {
+      const outcome: Outcome =
+        routed.kind === 'none' ? 'no-campaign' : 'other-client'
+      await recordWebhook(ctx, client, outcome, name)
+      return {
+        ok: true as const,
+        skipped: outcome,
+        reason: OUTCOME_LABEL[outcome],
+      }
     }
-    if (!campaignId) {
-      const campaigns = await ctx.db
-        .query('campaigns')
-        .withIndex('by_client', (q) => q.eq('clientSlug', client.slug))
-        .collect()
-      const pick =
-        campaigns
-          .filter((c) => !c.status || c.status === 'ACTIVE')
-          .sort((x, y) => y.createdAt.localeCompare(x.createdAt))
-          .at(0) ??
-        campaigns.sort((x, y) => y.createdAt.localeCompare(x.createdAt)).at(0)
-      campaignId = pick?.metaId
-    }
+    const campaignId = routed.metaId
 
     // Anti-doublon : même téléphone ou email déjà présent chez ce client.
     const phone = a.phone?.trim() ?? ''
     const email = a.email?.trim().toLowerCase() || undefined
     const dup = await findDuplicate(ctx, client.slug, phone, email)
-    if (dup) return { ok: true as const, id: dup._id, duplicate: true }
+    if (dup) {
+      const patch: { ghlContactId?: string; campaignId?: string } = {}
+      if (!dup.ghlContactId && a.ghlContactId)
+        patch.ghlContactId = a.ghlContactId
+      if (!dup.campaignId) patch.campaignId = campaignId
+      if (Object.keys(patch).length) await ctx.db.patch(dup._id, patch)
+      await recordWebhook(ctx, client, 'duplicate', name)
+      return { ok: true as const, id: dup._id, duplicate: true }
+    }
 
     const now = new Date()
     const iso = now.toISOString()
     const id = await ctx.db.insert('prospects', {
       clientSlug: client.slug,
       campaignId,
-      name: a.name.trim(),
+      name,
       phone,
       email,
       date: a.date?.slice(0, 10) || iso.slice(0, 10),
@@ -156,7 +247,19 @@ export const ingest = internalMutation({
       history: [{ status: 'new', at: iso, by: 'webhook' }],
       createdAt: iso,
     })
-    return { ok: true as const, id, duplicate: false }
+    await recordWebhook(
+      ctx,
+      client,
+      'imported',
+      routed.created ? `${name} · nouvelle campagne détectée` : name,
+    )
+    return {
+      ok: true as const,
+      id,
+      duplicate: false,
+      campaignId,
+      campaignCreated: routed.created,
+    }
   },
 })
 
@@ -167,11 +270,25 @@ const obj = (x: unknown): Record<string, unknown> =>
     ? (x as Record<string, unknown>)
     : {}
 
+// Attribution d'un payload GHL : imbriquée (contact.attributionSource) ou à
+// plat ; la « dernière » attribution est écrasée par la première (celle de
+// la création du contact = la pub d'origine).
+function attributionOf(body: Record<string, unknown>) {
+  const contact = obj(body.contact)
+  return {
+    ...obj(body.lastAttributionSource),
+    ...obj(contact.lastAttributionSource),
+    ...obj(body.attributionSource),
+    ...obj(contact.attributionSource),
+  }
+}
+
 // POST /api/leads — JSON, clé dans le corps (`key`), dans l'URL (`?key=`)
 // ou en en-tête `Authorization: Bearer <clé>`. Accepte des noms de champs
 // courants (name / full_name / firstName+lastName, phone / telephone,
 // email…) et le payload standard d'une action « Webhook » de workflow
-// GoHighLevel (first_name, phone, email, contact_id, attributionSource…).
+// GoHighLevel (first_name, phone, email, contact_id, location.id,
+// attributionSource…).
 export const receive = httpAction(async (ctx, req) => {
   const json = (data: unknown, status = 200) =>
     new Response(JSON.stringify(data), {
@@ -210,18 +327,51 @@ export const receive = httpAction(async (ctx, req) => {
   if (!name && !phone && !email)
     return json({ ok: false, error: 'name, phone ou email requis.' }, 400)
 
-  // Payload GHL : l'attribution est imbriquée (contact.attributionSource),
-  // la source contact est souvent vide → on la déduit du medium/sessionSource.
-  const contact = obj(body.contact)
-  const attr = {
-    ...obj(body.lastAttributionSource),
-    ...obj(contact.lastAttributionSource),
-    ...obj(body.attributionSource),
-    ...obj(contact.attributionSource),
-  }
-  const tags = Array.isArray(body.tags)
+  const ghlContactId = str(body.contact_id) || str(body.contactId) || undefined
+  let attr = attributionOf(body)
+  let tags = Array.isArray(body.tags)
     ? body.tags.filter((t): t is string => typeof t === 'string')
     : []
+
+  // Campagne explicite (n8n, Zapier…) prioritaire, sinon attribution GHL.
+  let campaignId =
+    str(body.campaignId) || str(body.campaign_id) || attributedCampaign(attr).id
+  let campaignName =
+    str(body.campaignName) ||
+    str(body.campaign_name) ||
+    attributedCampaign(attr).name
+
+  // Payload GHL sans attribution : on relit la fiche contact par l'API
+  // (le workflow n'embarque pas toujours attributionSource).
+  if (!campaignId && ghlContactId) {
+    const locationId =
+      str(obj(body.location).id) ||
+      str(body.locationId) ||
+      str(body.location_id)
+    const token = tokenFor(locationId)
+    if (token) {
+      try {
+        const contact = await fetchContact(token, ghlContactId)
+        if (contact) {
+          attr = {
+            ...obj(contact.lastAttributionSource),
+            ...obj(contact.attributionSource),
+            ...attr,
+          }
+          if (tags.length === 0 && Array.isArray(contact.tags))
+            tags = contact.tags.filter(
+              (t): t is string => typeof t === 'string',
+            )
+          const found = attributedCampaign(attr)
+          campaignId = found.id
+          campaignName = campaignName || found.name
+        }
+      } catch (e) {
+        console.error(`Relecture GHL du contact ${ghlContactId} en échec :`, e)
+      }
+    }
+  }
+
   const ghl = describeAttribution(attr, tags, str(body.contact_source))
   const hasAttr = Object.keys(attr).length > 0 || tags.length > 0
 
@@ -235,14 +385,11 @@ export const receive = httpAction(async (ctx, req) => {
       str(body.medium) ||
       str(body.utm_medium) ||
       (hasAttr ? ghl.medium : undefined),
-    campaignId:
-      str(body.campaignId) ||
-      str(body.campaign_id) ||
-      str(attr.campaignId) ||
-      undefined,
+    campaignId: campaignId || undefined,
+    campaignName: campaignName || undefined,
     date: str(body.date) || str(body.date_created) || undefined,
-    ghlContactId: str(body.contact_id) || str(body.contactId) || undefined,
+    ghlContactId,
   })
   if (!result.ok) return json(result, 401)
-  return json(result, 201)
+  return json(result, 'skipped' in result ? 200 : 201)
 })

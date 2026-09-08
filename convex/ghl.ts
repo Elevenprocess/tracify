@@ -1,8 +1,10 @@
 /**
  * Synchro GoHighLevel → Tracify : chaque campagne peut être rattachée à un
  * sous-compte GHL ; ses nouveaux contacts sont récupérés toutes les 10 min
- * (API contacts/search, filtre dateAdded) et déposés dans le CRM de la
- * campagne, sans rien configurer côté GHL.
+ * (API contacts/search, filtre dateAdded), sans rien configurer côté GHL.
+ * Chaque contact est rangé dans la campagne Meta de son attribution GHL
+ * (créée si nouvelle, voir convex/routing.ts) ; sans attribution il est
+ * ignoré. Complément du webhook (convex/leads.ts), idempotent avec lui.
  * Token d'intégration privée (PIT) dans l'env Convex :
  *   GHL_PRIVATE_INTEGRATION_TOKEN (par défaut) ou GHL_TOKEN_<locationId>.
  */
@@ -19,6 +21,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server'
 import { internal } from './_generated/api'
 import { requireUser } from './guard'
 import { findDuplicate } from './prospects'
+import { routeToCampaign } from './routing'
 
 const BASE_URL = 'https://services.leadconnectorhq.com'
 const API_VERSION = '2021-07-28'
@@ -65,11 +68,43 @@ export function describeAttribution(
   return { source, medium: session || medium || '—' }
 }
 
-function tokenFor(locationId: string): string | undefined {
+export function tokenFor(locationId: string): string | undefined {
   return (
-    process.env[`GHL_TOKEN_${locationId}`] ??
+    (locationId ? process.env[`GHL_TOKEN_${locationId}`] : undefined) ??
     process.env.GHL_PRIVATE_INTEGRATION_TOKEN
   )
+}
+
+// Fiche complète d'un contact (attribution incluse) — sert au webhook quand
+// le payload GHL n'embarque pas l'attribution.
+export async function fetchContact(
+  token: string,
+  contactId: string,
+): Promise<GhlContact | null> {
+  const res = await fetch(`${BASE_URL}/contacts/${contactId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Version: API_VERSION,
+      Accept: 'application/json',
+    },
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) return null
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  const contact = obj(data.contact)
+  return contact.id ? (contact as unknown as GhlContact) : null
+}
+
+// Campagne Meta désignée par l'attribution GHL d'un contact (lead ads) :
+// campaignId = ID de campagne Meta, campaign = son nom.
+export function attributedCampaign(attr: Record<string, unknown>): {
+  id?: string
+  name?: string
+} {
+  return {
+    id: str(attr.campaignId) || undefined,
+    name: str(attr.campaign) || str(attr.utmCampaign) || undefined,
+  }
 }
 
 interface GhlContact {
@@ -285,14 +320,26 @@ export const upsertContact = internalMutation({
       medium: v.string(),
       // Campagne Meta indiquée par l'attribution GHL (lead ads), si connue
       attributedCampaignId: v.optional(v.string()),
+      attributedCampaignName: v.optional(v.string()),
     }),
   },
-  handler: async (ctx, { clientSlug, metaId, contact }) => {
+  handler: async (ctx, { clientSlug, contact }) => {
     const known = await ctx.db
       .query('prospects')
       .withIndex('by_ghl', (q) => q.eq('ghlContactId', contact.id))
       .first()
     if (known) return 'duplicate' as const
+
+    // Le lead va dans la campagne de son attribution Meta (créée si
+    // nouvelle) — jamais dans la campagne synchronisée « par défaut ».
+    const routed = await routeToCampaign(
+      ctx,
+      clientSlug,
+      contact.attributedCampaignId,
+      contact.attributedCampaignName,
+    )
+    if (routed.kind !== 'campaign') return 'no-campaign' as const
+    const campaignId = routed.metaId
 
     const dup = await findDuplicate(
       ctx,
@@ -303,20 +350,9 @@ export const upsertContact = internalMutation({
     if (dup) {
       const patch: { ghlContactId?: string; campaignId?: string } = {}
       if (!dup.ghlContactId) patch.ghlContactId = contact.id
-      if (!dup.campaignId) patch.campaignId = metaId
+      if (!dup.campaignId) patch.campaignId = campaignId
       if (Object.keys(patch).length) await ctx.db.patch(dup._id, patch)
       return 'duplicate' as const
-    }
-
-    // Par défaut le lead va dans la campagne synchronisée ; si l'attribution
-    // GHL désigne une autre campagne du même client, on la respecte.
-    let campaignId = metaId
-    if (
-      contact.attributedCampaignId &&
-      contact.attributedCampaignId !== metaId
-    ) {
-      const other = await campaignByMeta(ctx, contact.attributedCampaignId)
-      if (other?.clientSlug === clientSlug) campaignId = other.metaId
     }
 
     await ctx.db.insert('prospects', {
@@ -343,7 +379,10 @@ export interface SyncResult {
   ok: boolean
   inserted: number
   duplicates: number
+  // Sans téléphone ni email
   skipped: number
+  // Sans campagne Meta dans l'attribution (simulateur, workflows, saisie…)
+  noCampaign: number
   scanned: number
   error?: string
 }
@@ -353,7 +392,13 @@ export const syncCampaign = internalAction({
   handler: async (ctx, { metaId }): Promise<SyncResult> => {
     const campaigns = await ctx.runQuery(internal.ghl.campaignsWithGhl, {})
     const campaign = campaigns.find((c) => c.metaId === metaId)
-    const empty = { inserted: 0, duplicates: 0, skipped: 0, scanned: 0 }
+    const empty = {
+      inserted: 0,
+      duplicates: 0,
+      skipped: 0,
+      noCampaign: 0,
+      scanned: 0,
+    }
     if (!campaign)
       return { ok: false, ...empty, error: 'Aucun sous-compte GHL rattaché.' }
 
@@ -410,6 +455,7 @@ export const syncCampaign = internalAction({
             tags,
             str(c.source) || undefined,
           )
+          const attributed = attributedCampaign(attr)
           const result = await ctx.runMutation(internal.ghl.upsertContact, {
             clientSlug: campaign.clientSlug,
             metaId,
@@ -421,10 +467,12 @@ export const syncCampaign = internalAction({
               dateAdded: str(c.dateAdded) || startedAt,
               source,
               medium,
-              attributedCampaignId: str(attr.campaignId) || undefined,
+              attributedCampaignId: attributed.id,
+              attributedCampaignName: attributed.name,
             },
           })
           if (result === 'inserted') counts.inserted++
+          else if (result === 'no-campaign') counts.noCampaign++
           else counts.duplicates++
         }
         if (contacts.length < PAGE) break

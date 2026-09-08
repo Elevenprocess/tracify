@@ -19,6 +19,7 @@ export interface CampaignItem {
   status: string | null
   lastSyncedAt: string | null
   syncError: string | null
+  origin?: 'meta' | 'ghl' | null
 }
 
 export default function CampaignsPanel({
@@ -72,8 +73,18 @@ export default function CampaignsPanel({
                   <MegaphoneIcon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="m-0 truncate text-sm font-semibold text-[var(--sea-ink)]">
-                    {c.name ?? `Campagne ${c.metaId}`}
+                  <p className="m-0 flex items-center gap-2 text-sm font-semibold text-[var(--sea-ink)]">
+                    <span className="truncate">
+                      {c.name ?? `Campagne ${c.metaId}`}
+                    </span>
+                    {c.origin === 'ghl' && (
+                      <span
+                        className="flex-shrink-0 rounded-md bg-[var(--lagoon-tint)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--lagoon)]"
+                        title="Campagne détectée automatiquement depuis l'attribution d'un lead GoHighLevel"
+                      >
+                        via GHL
+                      </span>
+                    )}
                   </p>
                   <p className="m-0 mt-0.5 text-xs text-[var(--sea-ink-soft)]">
                     <span className="tabular">{c.metaId}</span>

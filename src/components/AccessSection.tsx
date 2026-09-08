@@ -117,20 +117,7 @@ export default function AccessSection({ clientSlug }: { clientSlug: string }) {
           )}
         </article>
 
-        <article className="island-shell rise-in flex flex-col rounded-2xl p-5">
-          <h3 className="m-0 flex items-center gap-2 text-sm font-bold text-[var(--sea-ink)]">
-            <WebhookIcon className="h-4 w-4 text-[var(--lagoon)]" />
-            Réception des leads
-          </h3>
-          <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
-            Le webhook et la synchro GoHighLevel se règlent{' '}
-            <strong className="text-[var(--sea-ink)]">
-              sur la page de chaque campagne
-            </strong>{' '}
-            (section « Réception des leads ») : les prospects arrivent
-            directement dans le CRM de la campagne concernée.
-          </p>
-        </article>
+        <WebhookCard clientSlug={clientSlug} ghlGuide />
       </div>
     </section>
   )
@@ -173,7 +160,7 @@ export function GhlCard({ metaId }: { metaId: string }) {
       const r = await syncNow({ metaId })
       setResult(
         r.ok
-          ? `${formatNumber(r.inserted)} nouveau${r.inserted > 1 ? 'x' : ''} prospect${r.inserted > 1 ? 's' : ''} · ${formatNumber(r.duplicates)} déjà connu${r.duplicates > 1 ? 's' : ''}${r.skipped ? ` · ${formatNumber(r.skipped)} sans coordonnées ignoré${r.skipped > 1 ? 's' : ''}` : ''}`
+          ? `${formatNumber(r.inserted)} nouveau${r.inserted > 1 ? 'x' : ''} prospect${r.inserted > 1 ? 's' : ''} · ${formatNumber(r.duplicates)} déjà connu${r.duplicates > 1 ? 's' : ''}${r.noCampaign ? ` · ${formatNumber(r.noCampaign)} sans campagne ignoré${r.noCampaign > 1 ? 's' : ''}` : ''}${r.skipped ? ` · ${formatNumber(r.skipped)} sans coordonnées ignoré${r.skipped > 1 ? 's' : ''}` : ''}`
           : `Erreur : ${r.error ?? 'inconnue'}`,
       )
     } finally {
@@ -190,10 +177,11 @@ export function GhlCard({ metaId }: { metaId: string }) {
             Synchro GoHighLevel
           </h3>
           <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
-            Rattache un sous-compte GHL à cette campagne : ses nouveaux contacts
-            sont récupérés automatiquement toutes les 10 min dans ce CRM
-            (téléphone/email requis, doublons ignorés), avec leur provenance
-            (pub Facebook, simulateur, saisie…). Rien à configurer côté GHL.
+            Filet de sécurité du webhook : les nouveaux contacts du sous-compte
+            GHL sont relus toutes les 10 min. Chacun est rangé dans la campagne
+            Meta de son attribution (créée si nouvelle) — jamais dans une autre
+            ; sans campagne ou sans téléphone/email, il est ignoré. Rien à
+            configurer côté GHL.
           </p>
         </div>
         {ghl && !editing && (
@@ -280,22 +268,29 @@ export function GhlCard({ metaId }: { metaId: string }) {
   )
 }
 
-// Clé du webhook d'entrée des leads : à coller dans n8n / GHL / Zapier pour
-// que les prospects du client arrivent directement dans son pipeline.
+// Clé du webhook d'entrée des leads : à coller dans l'action « Webhook »
+// d'un workflow GoHighLevel (ou n8n / Zapier). Chaque lead est rangé dans la
+// campagne Meta de son attribution, créée dans Tracify si elle est nouvelle.
 export function WebhookCard({
   clientSlug,
   campaignId,
+  ghlGuide = false,
 }: {
   clientSlug: string
-  // Sur la page campagne : l'exemple est pré-rempli avec cet ID pour que
-  // les leads arrivent directement dans le CRM de la campagne.
+  // Sur la page campagne : l'exemple est pré-rempli avec cet ID (envoi
+  // manuel depuis n8n/Zapier) ; les payloads GHL sont aiguillés tout seuls.
   campaignId?: string
+  // Fiche client : pas à pas de branchement GHL + état des réceptions.
+  ghlGuide?: boolean
 }) {
-  const key = useQuery(api.leads.webhookKey, { clientSlug })
+  const status = useQuery(api.leads.webhookStatus, { clientSlug })
+  const key = status === undefined ? undefined : (status?.key ?? null)
   const generate = useMutation(api.leads.generateWebhookKey)
   const revoke = useMutation(api.leads.revokeWebhookKey)
   const [pending, setPending] = useState(false)
-  const [copied, setCopied] = useState<'url' | 'key' | 'body' | null>(null)
+  const [copied, setCopied] = useState<
+    'url' | 'key' | 'body' | 'ghlUrl' | null
+  >(null)
 
   const run = async (fn: () => Promise<unknown>) => {
     setPending(true)
@@ -305,12 +300,16 @@ export function WebhookCard({
       setPending(false)
     }
   }
-  const copy = async (what: 'url' | 'key' | 'body', text: string) => {
+  const copy = async (
+    what: 'url' | 'key' | 'body' | 'ghlUrl',
+    text: string,
+  ) => {
     await navigator.clipboard.writeText(text)
     setCopied(what)
     setTimeout(() => setCopied(null), 2000)
   }
 
+  const ghlUrl = key ? `${WEBHOOK_URL}?key=${key}` : ''
   const example = key
     ? JSON.stringify(
         {
@@ -330,13 +329,29 @@ export function WebhookCard({
     <article className="island-shell rise-in flex flex-col rounded-2xl p-5">
       <h3 className="m-0 flex items-center gap-2 text-sm font-bold text-[var(--sea-ink)]">
         <WebhookIcon className="h-4 w-4 text-[var(--lagoon)]" />
-        Réception des leads (webhook)
+        {ghlGuide ? 'Webhook GoHighLevel' : 'Réception des leads (webhook)'}
       </h3>
       <p className="m-0 mt-1 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
-        Envoie les prospects de ce client en <code>POST</code> JSON sur cette
-        adresse (depuis n8n, GHL, Zapier…) : ils apparaissent dans son pipeline
-        ici et dans son espace client. Les doublons (même téléphone ou email)
-        sont ignorés.
+        {ghlGuide ? (
+          <>
+            Un seul webhook pour ce client, à coller dans un workflow GHL :
+            chaque lead est rangé dans la{' '}
+            <strong className="text-[var(--sea-ink)]">
+              campagne Meta de son attribution
+            </strong>{' '}
+            (campagne 1 → campagne 1, jamais dans une autre). Une campagne
+            inconnue est créée automatiquement dans « Campagnes Meta » ; un lead
+            sans campagne ou déjà connu est ignoré.
+          </>
+        ) : (
+          <>
+            Envoie les prospects de ce client en <code>POST</code> JSON sur
+            cette adresse (depuis n8n, Zapier…). Les leads GoHighLevel sont
+            aiguillés par leur attribution ; pour un envoi manuel, indique{' '}
+            <code>campaignId</code>. Les doublons (même téléphone ou email) sont
+            ignorés.
+          </>
+        )}
       </p>
 
       {key === undefined ? (
@@ -366,31 +381,98 @@ export function WebhookCard({
             copied={copied === 'key'}
             onCopy={() => copy('key', key)}
           />
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <span className="island-kicker">Exemple de corps</span>
-              <button
-                type="button"
-                onClick={() => copy('body', example)}
-                className="btn btn-ghost btn-sm"
-              >
-                {copied === 'body' ? (
-                  <CheckIcon className="h-3 w-3 text-[var(--status-good)]" />
-                ) : (
-                  <CopyIcon className="h-3 w-3" />
-                )}
-                {copied === 'body' ? 'Copié' : 'Copier'}
-              </button>
+          {ghlGuide && (
+            <>
+              <ol className="m-0 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-[var(--sea-ink-soft)]">
+                <li>
+                  Dans GHL : <strong>Automatisation → Workflows</strong>, créer
+                  un workflow vierge.
+                </li>
+                <li>
+                  Déclencheur <strong>« Contact créé »</strong> (ou « Facebook
+                  Lead Form Submitted » pour ne prendre que les pubs).
+                </li>
+                <li>
+                  Action <strong>« Webhook »</strong>, méthode POST, coller
+                  l'URL ci-dessous (la clé est dedans), corps par défaut.
+                </li>
+                <li>Publier le workflow. C'est tout côté GHL.</li>
+              </ol>
+              <Row
+                label="GHL"
+                value={ghlUrl}
+                copied={copied === 'ghlUrl'}
+                onCopy={() => copy('ghlUrl', ghlUrl)}
+              />
+              {status && (
+                <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-xs text-[var(--sea-ink-soft)]">
+                  {status.lastAt ? (
+                    <>
+                      <p className="m-0">
+                        <CheckIcon className="mr-1 inline h-3.5 w-3.5 text-[var(--status-good)]" />
+                        Relié à GHL · dernière réception{' '}
+                        {formatAgo(status.lastAt)}
+                        {status.lastOutcome ? ` : ${status.lastOutcome}` : ''}
+                      </p>
+                      <p className="m-0 mt-1">
+                        <strong className="text-[var(--sea-ink)]">
+                          {formatNumber(status.counts.received)}
+                        </strong>{' '}
+                        reçu{status.counts.received > 1 ? 's' : ''} ·{' '}
+                        {formatNumber(status.counts.imported)} ajouté
+                        {status.counts.imported > 1 ? 's' : ''} ·{' '}
+                        {formatNumber(status.counts.duplicates)} déjà connu
+                        {status.counts.duplicates > 1 ? 's' : ''} ·{' '}
+                        {formatNumber(status.counts.noCampaign)} sans campagne
+                      </p>
+                    </>
+                  ) : (
+                    <p className="m-0">
+                      <AlertIcon className="mr-1 inline h-3.5 w-3.5 text-[var(--status-warn)]" />
+                      Aucune réception pour l'instant : publie le workflow GHL,
+                      le premier lead apparaîtra ici.
+                    </p>
+                  )}
+                  {status.detected.length > 0 && (
+                    <p className="m-0 mt-1">
+                      Campagne{status.detected.length > 1 ? 's' : ''} détectée
+                      {status.detected.length > 1 ? 's' : ''} via GHL :{' '}
+                      {status.detected
+                        .map((c) => c.name ?? c.metaId)
+                        .join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {!ghlGuide && (
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="island-kicker">Exemple de corps</span>
+                <button
+                  type="button"
+                  onClick={() => copy('body', example)}
+                  className="btn btn-ghost btn-sm"
+                >
+                  {copied === 'body' ? (
+                    <CheckIcon className="h-3 w-3 text-[var(--status-good)]" />
+                  ) : (
+                    <CopyIcon className="h-3 w-3" />
+                  )}
+                  {copied === 'body' ? 'Copié' : 'Copier'}
+                </button>
+              </div>
+              <pre className="m-0 overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] p-3 text-[11px] leading-relaxed text-[var(--sea-ink)]">
+                {example}
+              </pre>
+              <p className="m-0 mt-1.5 text-[11px] leading-relaxed text-[var(--sea-ink-faint)]">
+                Champs acceptés : name (ou first_name + last_name), phone,
+                email, source, medium, campaignId, date. La clé peut aussi
+                passer en en-tête <code>Authorization: Bearer …</code>.
+              </p>
             </div>
-            <pre className="m-0 overflow-x-auto rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] p-3 text-[11px] leading-relaxed text-[var(--sea-ink)]">
-              {example}
-            </pre>
-            <p className="m-0 mt-1.5 text-[11px] leading-relaxed text-[var(--sea-ink-faint)]">
-              Champs acceptés : name (ou first_name + last_name), phone, email,
-              source, medium, campaignId, date. La clé peut aussi passer en
-              en-tête <code>Authorization: Bearer …</code>.
-            </p>
-          </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
