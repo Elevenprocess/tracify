@@ -415,6 +415,63 @@ export const assertAdAccount = internalAction({
   },
 })
 
+// Rattachement automatique du compte publicitaire depuis un lead GHL : la
+// campagne Meta de l'attribution permet de retrouver son compte (act_…) ;
+// s'il est accessible avec le token et que le client n'en a pas encore, on
+// le pose et on lance la détection de toutes ses campagnes actives.
+export const linkAccountFromCampaign = internalAction({
+  args: { clientSlug: v.string(), metaId: v.string() },
+  handler: async (
+    ctx,
+    { clientSlug, metaId },
+  ): Promise<{ linked: boolean; account: string | null }> => {
+    const current: { exists: boolean; account: string | null } =
+      await ctx.runQuery(internal.meta.clientAdAccount, { clientSlug })
+    if (!current.exists || current.account)
+      return { linked: false, account: current.account }
+    const params = new URLSearchParams({
+      fields: 'account_id',
+      access_token: metaAccessToken(),
+    })
+    const res = await fetch(`${GRAPH_BASE}/${metaId}?${params}`)
+    if (!res.ok) {
+      console.warn(
+        `Compte publicitaire de ${metaId} introuvable (${res.status}) : campagne hors du token Meta ?`,
+      )
+      return { linked: false, account: null }
+    }
+    const json = (await res.json()) as { account_id?: string }
+    if (!json.account_id) return { linked: false, account: null }
+    const account = `act_${json.account_id}`
+    await ctx.runMutation(internal.clients.patchAdAccount, {
+      slug: clientSlug,
+      adAccountId: account,
+    })
+    await ctx.runAction(internal.meta.discoverCampaigns, {
+      clientSlug,
+      account,
+    })
+    console.log(
+      `Compte ${account} rattaché à ${clientSlug} via la campagne ${metaId}`,
+    )
+    return { linked: true, account }
+  },
+})
+
+export const clientAdAccount = internalQuery({
+  args: { clientSlug: v.string() },
+  handler: async (ctx, { clientSlug }) => {
+    const client = await ctx.db
+      .query('clients')
+      .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+      .unique()
+    return {
+      exists: Boolean(client),
+      account: client?.adAccountId || null,
+    }
+  },
+})
+
 export const listClientsWithAccounts = internalQuery({
   args: {},
   handler: async (ctx) => {

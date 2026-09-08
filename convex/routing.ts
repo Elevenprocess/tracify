@@ -37,6 +37,7 @@ export async function routeToCampaign(
     // Nom connu côté GHL mais pas encore côté Tracify (Meta injoignable).
     if (!existing.name && campaignName)
       await ctx.db.patch(existing._id, { name: campaignName })
+    await linkAccountIfMissing(ctx, clientSlug, metaId)
     return { kind: 'campaign', metaId, created: false }
   }
 
@@ -55,5 +56,24 @@ export async function routeToCampaign(
     metaId,
     origin: 'ghl',
   })
+  await linkAccountIfMissing(ctx, clientSlug, metaId)
   return { kind: 'campaign', metaId, created: true }
+}
+
+// Client sans compte publicitaire : on le déduit de la campagne du lead
+// (Graph API, en tâche de fond) pour que dépenses, stats et CPL suivent.
+async function linkAccountIfMissing(
+  ctx: MutationCtx,
+  clientSlug: string,
+  metaId: string,
+) {
+  const client = await ctx.db
+    .query('clients')
+    .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+    .unique()
+  if (!client || client.adAccountId) return
+  await ctx.scheduler.runAfter(0, internal.meta.linkAccountFromCampaign, {
+    clientSlug,
+    metaId,
+  })
 }
