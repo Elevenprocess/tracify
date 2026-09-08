@@ -20,6 +20,7 @@ import type * as http from "../http.js";
 import type * as leads from "../leads.js";
 import type * as meta from "../meta.js";
 import type * as prospects from "../prospects.js";
+import type * as routing from "../routing.js";
 import type * as seed from "../seed.js";
 
 import type {
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   leads: typeof leads;
   meta: typeof meta;
   prospects: typeof prospects;
+  routing: typeof routing;
   seed: typeof seed;
 }>;
 
