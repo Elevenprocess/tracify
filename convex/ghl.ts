@@ -799,6 +799,39 @@ export const syncClient = internalAction({
   },
 })
 
+// Sous-comptes de l'agence (token GHL_AGENCY_TOKEN) pour choisir le client
+// dans une liste au lieu de recopier un Location ID. Vide sans token agence.
+export const agencyLocations = action({
+  args: {},
+  handler: async (ctx): Promise<Array<{ id: string; name: string }>> => {
+    await requireUser(ctx)
+    const agency = process.env.GHL_AGENCY_TOKEN
+    if (!agency) return []
+    const companyId = process.env.GHL_AGENCY_COMPANY_ID ?? ''
+    const out: Array<{ id: string; name: string }> = []
+    for (let skip = 0; skip < 1000; skip += 100) {
+      const qs = new URLSearchParams({ limit: '100', skip: String(skip) })
+      if (companyId) qs.set('companyId', companyId)
+      let data: Record<string, unknown>
+      try {
+        data = await ghlGet(agency, `/locations/search?${qs}`)
+      } catch (e) {
+        console.error('Liste des sous-comptes agence en échec :', e)
+        break
+      }
+      const rows = Array.isArray(data.locations)
+        ? (data.locations as Array<Record<string, unknown>>)
+        : []
+      for (const l of rows) {
+        const id = str(l.id)
+        if (id) out.push({ id, name: str(l.name) || id })
+      }
+      if (rows.length < 100) break
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  },
+})
+
 // Bouton « Détecter maintenant » (fiche client) : enregistre le sous-compte
 // puis relit 90 jours de contacts. Le rattachement du compte publicitaire
 // est déclenché par l'aiguillage (routing.ts) sur la première campagne vue.

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAction, useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
@@ -288,8 +288,28 @@ export function WebhookCard({
   const generate = useMutation(api.leads.generateWebhookKey)
   const revoke = useMutation(api.leads.revokeWebhookKey)
   const detectNow = useAction(api.ghl.detectNow)
+  const agencyLocations = useAction(api.ghl.agencyLocations)
   const [pending, setPending] = useState(false)
   const [location, setLocation] = useState('')
+  // Sous-comptes de l'agence GHL (liste déroulante) ; null = pas de token agence
+  const [locations, setLocations] = useState<Array<{
+    id: string
+    name: string
+  }> | null>(null)
+  useEffect(() => {
+    if (!ghlGuide) return
+    let alive = true
+    agencyLocations({})
+      .then((rows) => {
+        if (alive) setLocations(rows.length ? rows : null)
+      })
+      .catch(() => {
+        if (alive) setLocations(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [ghlGuide, agencyLocations])
   const [detecting, setDetecting] = useState(false)
   const [detected, setDetected] = useState<string | null>(null)
 
@@ -447,15 +467,31 @@ export function WebhookCard({
                   onSubmit={runDetect}
                   className="mt-2 flex flex-wrap gap-2"
                 >
-                  <input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder={
-                      status?.ghl?.locationId ??
-                      'Location ID, ex. djBlEHfSx8UmYXjUqhCS'
-                    }
-                    className="field min-w-0 flex-1"
-                  />
+                  {locations ? (
+                    <select
+                      value={location || status?.ghl?.locationId || ''}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="field min-w-0 flex-1"
+                      aria-label="Sous-compte GHL"
+                    >
+                      <option value="">Choisir le sous-compte GHL…</option>
+                      {locations.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder={
+                        status?.ghl?.locationId ??
+                        'Location ID, ex. djBlEHfSx8UmYXjUqhCS'
+                      }
+                      className="field min-w-0 flex-1"
+                    />
+                  )}
                   <button
                     type="submit"
                     disabled={detecting || (!location.trim() && !status?.ghl)}
