@@ -17,7 +17,7 @@ import {
   mutation,
   query,
 } from './_generated/server'
-import type { MutationCtx, QueryCtx } from './_generated/server'
+import type { ActionCtx, MutationCtx, QueryCtx } from './_generated/server'
 import { internal } from './_generated/api'
 import { requireUser } from './guard'
 import { findDuplicate } from './prospects'
@@ -309,7 +309,8 @@ export const markSync = internalMutation({
 export const upsertContact = internalMutation({
   args: {
     clientSlug: v.string(),
-    metaId: v.string(),
+    // Conservé pour compatibilité : l'aiguillage se fait par attribution.
+    metaId: v.optional(v.string()),
     contact: v.object({
       id: v.string(),
       name: v.string(),
@@ -387,6 +388,92 @@ export interface SyncResult {
   error?: string
 }
 
+// Parcourt les contacts d'un sous-compte créés depuis `since` et les dépose
+// (aiguillage par attribution). Partagé par la synchro par campagne (legacy)
+// et la synchro par client.
+async function scanLocation(
+  ctx: ActionCtx,
+  args: {
+    clientSlug: string
+    locationId: string
+    token: string
+    since: Date
+    startedAt: string
+  },
+): Promise<Omit<SyncResult, 'ok' | 'error'>> {
+  const counts = {
+    inserted: 0,
+    duplicates: 0,
+    skipped: 0,
+    noCampaign: 0,
+    scanned: 0,
+  }
+  let searchAfter: Array<unknown> | undefined
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { contacts } = await searchContacts(
+      args.token,
+      args.locationId,
+      args.since.toISOString(),
+      searchAfter,
+    )
+    for (const c of contacts) {
+      counts.scanned++
+      const phone = str(c.phone)
+      const email = str(c.email).toLowerCase() || undefined
+      // Sans téléphone ni email (conversation Messenger anonyme…) : on ne
+      // crée pas de prospect injoignable.
+      if (!phone && !email) {
+        counts.skipped++
+        continue
+      }
+      const name =
+        [str(c.firstName), str(c.lastName)].filter(Boolean).join(' ') ||
+        str(c.contactName) ||
+        phone ||
+        email!
+      const attr = {
+        ...obj(c.lastAttributionSource),
+        ...obj(c.attributionSource),
+      }
+      const tags = Array.isArray(c.tags)
+        ? c.tags.filter((t): t is string => typeof t === 'string')
+        : []
+      const { source, medium } = describeAttribution(
+        attr,
+        tags,
+        str(c.source) || undefined,
+      )
+      const attributed = attributedCampaign(attr)
+      // Sans campagne : inutile d'ouvrir une transaction.
+      if (!attributed.id) {
+        counts.noCampaign++
+        continue
+      }
+      const result = await ctx.runMutation(internal.ghl.upsertContact, {
+        clientSlug: args.clientSlug,
+        contact: {
+          id: c.id,
+          name,
+          phone,
+          email,
+          dateAdded: str(c.dateAdded) || args.startedAt,
+          source,
+          medium,
+          attributedCampaignId: attributed.id,
+          attributedCampaignName: attributed.name,
+        },
+      })
+      if (result === 'inserted') counts.inserted++
+      else if (result === 'no-campaign') counts.noCampaign++
+      else counts.duplicates++
+    }
+    if (contacts.length < PAGE) break
+    searchAfter = contacts[contacts.length - 1]?.searchAfter
+    if (!searchAfter) break
+  }
+  return counts
+}
+
 export const syncCampaign = internalAction({
   args: { metaId: v.string() },
   handler: async (ctx, { metaId }): Promise<SyncResult> => {
@@ -418,67 +505,14 @@ export const syncCampaign = internalAction({
       ? new Date(Date.parse(campaign.lastSyncAt) - OVERLAP_MS)
       : new Date(Date.now() - INITIAL_WINDOW_MS)
 
-    const counts = { ...empty }
     try {
-      let searchAfter: Array<unknown> | undefined
-      for (let page = 0; page < MAX_PAGES; page++) {
-        const { contacts } = await searchContacts(
-          token,
-          campaign.locationId,
-          since.toISOString(),
-          searchAfter,
-        )
-        for (const c of contacts) {
-          counts.scanned++
-          const phone = str(c.phone)
-          const email = str(c.email).toLowerCase() || undefined
-          // Sans téléphone ni email (conversation Messenger anonyme…) : on ne
-          // crée pas de prospect injoignable.
-          if (!phone && !email) {
-            counts.skipped++
-            continue
-          }
-          const name =
-            [str(c.firstName), str(c.lastName)].filter(Boolean).join(' ') ||
-            str(c.contactName) ||
-            phone ||
-            email!
-          const attr = {
-            ...obj(c.lastAttributionSource),
-            ...obj(c.attributionSource),
-          }
-          const tags = Array.isArray(c.tags)
-            ? c.tags.filter((t): t is string => typeof t === 'string')
-            : []
-          const { source, medium } = describeAttribution(
-            attr,
-            tags,
-            str(c.source) || undefined,
-          )
-          const attributed = attributedCampaign(attr)
-          const result = await ctx.runMutation(internal.ghl.upsertContact, {
-            clientSlug: campaign.clientSlug,
-            metaId,
-            contact: {
-              id: c.id,
-              name,
-              phone,
-              email,
-              dateAdded: str(c.dateAdded) || startedAt,
-              source,
-              medium,
-              attributedCampaignId: attributed.id,
-              attributedCampaignName: attributed.name,
-            },
-          })
-          if (result === 'inserted') counts.inserted++
-          else if (result === 'no-campaign') counts.noCampaign++
-          else counts.duplicates++
-        }
-        if (contacts.length < PAGE) break
-        searchAfter = contacts[contacts.length - 1]?.searchAfter
-        if (!searchAfter) break
-      }
+      const counts = await scanLocation(ctx, {
+        clientSlug: campaign.clientSlug,
+        locationId: campaign.locationId,
+        token,
+        since,
+        startedAt,
+      })
       await ctx.runMutation(internal.ghl.markSync, { metaId, at: startedAt })
       return { ok: true, ...counts }
     } catch (err) {
@@ -488,17 +522,192 @@ export const syncCampaign = internalAction({
         at: startedAt,
         error,
       })
-      return { ok: false, ...counts, error }
+      return { ok: false, ...empty, error }
     }
   },
 })
 
-// Cron : toutes les campagnes rattachées à un sous-compte GHL.
+// --- Synchro par client (sous-compte GHL rattaché au client) ---------------
+//
+// Au branchement du webhook on renseigne le sous-compte GHL du client :
+// « Détecter maintenant » relit les contacts des 90 derniers jours pour
+// créer les campagnes, rattacher le compte publicitaire et importer les
+// prospects déjà attribués — sans attendre le premier lead. Ensuite le cron
+// relit les nouveaux contacts toutes les 10 min (curseur clients.ghlLastSyncAt).
+
+const BOOTSTRAP_WINDOW_DAYS = 90
+
+export const clientGhl = internalQuery({
+  args: { clientSlug: v.string() },
+  handler: async (ctx, { clientSlug }) => {
+    const client = await ctx.db
+      .query('clients')
+      .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+      .unique()
+    if (!client?.ghlLocationId) return null
+    return {
+      locationId: client.ghlLocationId,
+      lastSyncAt: client.ghlLastSyncAt ?? null,
+    }
+  },
+})
+
+export const clientsWithGhl = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const clients = await ctx.db.query('clients').collect()
+    return clients
+      .filter((c) => c.ghlLocationId)
+      .map((c) => ({ clientSlug: c.slug, locationId: c.ghlLocationId! }))
+  },
+})
+
+export const markClientSync = internalMutation({
+  args: {
+    clientSlug: v.string(),
+    at: v.string(),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, { clientSlug, at, error }) => {
+    const client = await ctx.db
+      .query('clients')
+      .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+      .unique()
+    if (!client) return
+    await ctx.db.patch(client._id, {
+      ...(error ? {} : { ghlLastSyncAt: at }),
+      ghlSyncError: error,
+    })
+  },
+})
+
+async function patchClientLocation(
+  ctx: MutationCtx,
+  clientSlug: string,
+  locationId: string,
+) {
+  const client = await ctx.db
+    .query('clients')
+    .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+    .unique()
+  if (!client) throw new Error('Client introuvable.')
+  await ctx.db.patch(client._id, {
+    ghlLocationId: locationId.trim() || undefined,
+    ghlLastSyncAt: undefined,
+    ghlSyncError: undefined,
+  })
+}
+
+// Rattache (ou détache avec une chaîne vide) le sous-compte GHL du client.
+export const setClientLocation = mutation({
+  args: { clientSlug: v.string(), locationId: v.string() },
+  handler: async (ctx, { clientSlug, locationId }) => {
+    await requireUser(ctx)
+    await patchClientLocation(ctx, clientSlug, locationId)
+  },
+})
+
+// Outil CLI : `npx convex run ghl:setClientLocationCli '{"clientSlug":"…","locationId":"…"}'`
+export const setClientLocationCli = internalMutation({
+  args: { clientSlug: v.string(), locationId: v.string() },
+  handler: async (ctx, { clientSlug, locationId }) => {
+    await patchClientLocation(ctx, clientSlug, locationId)
+  },
+})
+
+export const syncClient = internalAction({
+  args: {
+    clientSlug: v.string(),
+    // Forcé (bootstrap) : relit N jours au lieu de repartir du curseur.
+    windowDays: v.optional(v.number()),
+  },
+  handler: async (ctx, { clientSlug, windowDays }): Promise<SyncResult> => {
+    const empty = {
+      inserted: 0,
+      duplicates: 0,
+      skipped: 0,
+      noCampaign: 0,
+      scanned: 0,
+    }
+    const link = await ctx.runQuery(internal.ghl.clientGhl, { clientSlug })
+    if (!link)
+      return { ok: false, ...empty, error: 'Aucun sous-compte GHL rattaché.' }
+    const token = tokenFor(link.locationId)
+    const startedAt = new Date().toISOString()
+    if (!token) {
+      const error = 'Token GHL manquant (GHL_PRIVATE_INTEGRATION_TOKEN).'
+      await ctx.runMutation(internal.ghl.markClientSync, {
+        clientSlug,
+        at: startedAt,
+        error,
+      })
+      return { ok: false, ...empty, error }
+    }
+    const since = windowDays
+      ? new Date(Date.now() - windowDays * 86_400_000)
+      : link.lastSyncAt
+        ? new Date(Date.parse(link.lastSyncAt) - OVERLAP_MS)
+        : new Date(Date.now() - INITIAL_WINDOW_MS)
+    try {
+      const counts = await scanLocation(ctx, {
+        clientSlug,
+        locationId: link.locationId,
+        token,
+        since,
+        startedAt,
+      })
+      await ctx.runMutation(internal.ghl.markClientSync, {
+        clientSlug,
+        at: startedAt,
+      })
+      return { ok: true, ...counts }
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err)
+      await ctx.runMutation(internal.ghl.markClientSync, {
+        clientSlug,
+        at: startedAt,
+        error,
+      })
+      return { ok: false, ...empty, error }
+    }
+  },
+})
+
+// Bouton « Détecter maintenant » (fiche client) : enregistre le sous-compte
+// puis relit 90 jours de contacts. Le rattachement du compte publicitaire
+// est déclenché par l'aiguillage (routing.ts) sur la première campagne vue.
+export const detectNow = action({
+  args: { clientSlug: v.string(), locationId: v.string() },
+  handler: async (ctx, { clientSlug, locationId }): Promise<SyncResult> => {
+    await requireUser(ctx)
+    const cleaned = locationId.trim()
+    if (!cleaned) throw new Error('Location ID GHL requis.')
+    await ctx.runMutation(internal.ghl.setClientLocationCli, {
+      clientSlug,
+      locationId: cleaned,
+    })
+    return await ctx.runAction(internal.ghl.syncClient, {
+      clientSlug,
+      windowDays: BOOTSTRAP_WINDOW_DAYS,
+    })
+  },
+})
+
+// Cron : sous-comptes rattachés aux clients, puis (legacy) aux campagnes —
+// sauf si le client couvre déjà le même sous-compte.
 export const syncAll = internalAction({
   args: {},
   handler: async (ctx) => {
+    const clients = await ctx.runQuery(internal.ghl.clientsWithGhl, {})
+    for (const c of clients) {
+      await ctx.runAction(internal.ghl.syncClient, { clientSlug: c.clientSlug })
+    }
+    const covered = new Set(
+      clients.map((c) => `${c.clientSlug}:${c.locationId}`),
+    )
     const campaigns = await ctx.runQuery(internal.ghl.campaignsWithGhl, {})
     for (const c of campaigns) {
+      if (covered.has(`${c.clientSlug}:${c.locationId}`)) continue
       await ctx.runAction(internal.ghl.syncCampaign, { metaId: c.metaId })
     }
   },

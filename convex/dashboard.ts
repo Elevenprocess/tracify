@@ -272,6 +272,12 @@ export const client = query({
         hasWebhook: Boolean(client.webhookKey),
         // Synchro GHL : rattachée par campagne — on résume au niveau du compte
         ghl: (() => {
+          if (client.ghlLocationId)
+            return {
+              locationId: client.ghlLocationId,
+              lastSyncAt: client.ghlLastSyncAt ?? null,
+              error: client.ghlSyncError ?? null,
+            }
           const linked = campaigns.filter((c) => c.ghlLocationId)
           if (linked.length === 0) return null
           const last = linked.reduce<string | null>(

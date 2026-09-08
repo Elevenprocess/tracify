@@ -66,6 +66,15 @@ export const webhookStatus = query({
       .collect()
     return {
       key: client.webhookKey ?? null,
+      // Sous-compte GHL du client (relecture 10 min + « Détecter maintenant »)
+      ghl: client.ghlLocationId
+        ? {
+            locationId: client.ghlLocationId,
+            lastSyncAt: client.ghlLastSyncAt ?? null,
+            error: client.ghlSyncError ?? null,
+          }
+        : null,
+      adAccountId: client.adAccountId || null,
       lastAt: client.webhookLastAt ?? null,
       lastOutcome: client.webhookLastOutcome ?? null,
       counts: client.webhookCounts ?? {

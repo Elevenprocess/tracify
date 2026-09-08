@@ -287,7 +287,34 @@ export function WebhookCard({
   const key = status === undefined ? undefined : (status?.key ?? null)
   const generate = useMutation(api.leads.generateWebhookKey)
   const revoke = useMutation(api.leads.revokeWebhookKey)
+  const detectNow = useAction(api.ghl.detectNow)
   const [pending, setPending] = useState(false)
+  const [location, setLocation] = useState('')
+  const [detecting, setDetecting] = useState(false)
+  const [detected, setDetected] = useState<string | null>(null)
+
+  const runDetect = async (e: FormEvent) => {
+    e.preventDefault()
+    const value = location.trim() || status?.ghl?.locationId || ''
+    if (!value || detecting) return
+    setDetecting(true)
+    setDetected(null)
+    try {
+      const r = await detectNow({ clientSlug, locationId: value })
+      setDetected(
+        r.ok
+          ? `${formatNumber(r.scanned)} contact${r.scanned > 1 ? 's' : ''} relu${r.scanned > 1 ? 's' : ''} sur 90 jours · ${formatNumber(r.inserted)} prospect${r.inserted > 1 ? 's' : ''} importé${r.inserted > 1 ? 's' : ''} · ${formatNumber(r.duplicates)} déjà connu${r.duplicates > 1 ? 's' : ''} · ${formatNumber(r.noCampaign)} sans campagne`
+          : `Erreur : ${r.error ?? 'inconnue'}`,
+      )
+      setLocation('')
+    } catch (err) {
+      setDetected(
+        `Erreur : ${err instanceof Error ? err.message : String(err)}`,
+      )
+    } finally {
+      setDetecting(false)
+    }
+  }
   const [copied, setCopied] = useState<
     'url' | 'key' | 'body' | 'ghlUrl' | null
   >(null)
@@ -404,6 +431,69 @@ export function WebhookCard({
                 copied={copied === 'ghlUrl'}
                 onCopy={() => copy('ghlUrl', ghlUrl)}
               />
+              <div className="rounded-xl border border-[var(--lagoon-line)] bg-[var(--lagoon-tint)] px-3 py-2.5">
+                <p className="m-0 text-xs font-bold text-[var(--sea-ink)]">
+                  Sans attendre le premier lead
+                </p>
+                <p className="m-0 mt-0.5 text-[11px] leading-relaxed text-[var(--sea-ink-soft)]">
+                  Indique le sous-compte GHL du client (Paramètres → Profil de
+                  l'entreprise → « Location ID ») : Tracify relit tout de suite
+                  ses contacts des 90 derniers jours pour créer les campagnes,
+                  rattacher le compte publicitaire Meta et importer les
+                  prospects déjà attribués. Ensuite les nouveaux contacts sont
+                  relus toutes les 10 min, en plus du webhook.
+                </p>
+                <form
+                  onSubmit={runDetect}
+                  className="mt-2 flex flex-wrap gap-2"
+                >
+                  <input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder={
+                      status?.ghl?.locationId ??
+                      'Location ID, ex. djBlEHfSx8UmYXjUqhCS'
+                    }
+                    className="field min-w-0 flex-1"
+                  />
+                  <button
+                    type="submit"
+                    disabled={detecting || (!location.trim() && !status?.ghl)}
+                    className="btn btn-primary btn-sm"
+                  >
+                    <RefreshIcon
+                      className={`h-3.5 w-3.5 ${detecting ? 'animate-spin' : ''}`}
+                    />
+                    {detecting ? 'Détection…' : 'Détecter maintenant'}
+                  </button>
+                </form>
+                {status?.ghl && (
+                  <p className="m-0 mt-2 text-[11px] text-[var(--sea-ink-soft)]">
+                    Sous-compte{' '}
+                    <span className="tabular text-[var(--sea-ink)]">
+                      {status.ghl.locationId}
+                    </span>
+                    {status.ghl.lastSyncAt
+                      ? ` · dernière relecture ${formatAgo(status.ghl.lastSyncAt)}`
+                      : ' · pas encore relu'}
+                    {status.adAccountId
+                      ? ` · compte publicitaire ${status.adAccountId}`
+                      : ' · compte publicitaire pas encore rattaché'}
+                  </p>
+                )}
+                {status?.ghl?.error && (
+                  <p className="m-0 mt-1 flex items-center gap-1 text-[11px] text-[var(--status-warn)]">
+                    <AlertIcon className="h-3 w-3 flex-shrink-0" />
+                    Dernière relecture en erreur : {status.ghl.error}
+                  </p>
+                )}
+                {detected && (
+                  <p className="m-0 mt-1 flex items-center gap-1 text-[11px] text-[var(--sea-ink)]">
+                    <CheckIcon className="h-3 w-3 text-[var(--status-good)]" />
+                    {detected}
+                  </p>
+                )}
+              </div>
               {status && (
                 <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-solid)] px-3 py-2 text-xs text-[var(--sea-ink-soft)]">
                   {status.lastAt ? (

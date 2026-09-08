@@ -38,8 +38,9 @@ export default defineSchema({
         noCampaign: v.number(),
       }),
     ),
-    // Ancien rattachement GHL au niveau client (déplacé sur les campagnes
-    // le 18/08) — conservé pour les données existantes, plus utilisé.
+    // Sous-compte GHL du client (Location ID) : renseigné au branchement du
+    // webhook, « Détecter maintenant » relit 90 j de contacts, puis le cron
+    // relit les nouveaux toutes les 10 min (curseur ghlLastSyncAt).
     ghlLocationId: v.optional(v.string()),
     ghlLastSyncAt: v.optional(v.string()),
     ghlSyncError: v.optional(v.string()),
