@@ -23,7 +23,7 @@ import {
   attributedCampaign,
   describeAttribution,
   fetchContact,
-  tokenFor,
+  resolveToken,
 } from './ghl'
 import { routeToCampaign } from './routing'
 
@@ -357,7 +357,7 @@ export const receive = httpAction(async (ctx, req) => {
       str(obj(body.location).id) ||
       str(body.locationId) ||
       str(body.location_id)
-    const token = tokenFor(locationId)
+    const token = await resolveToken(ctx, locationId)
     if (token) {
       try {
         const contact = await fetchContact(token, ghlContactId)

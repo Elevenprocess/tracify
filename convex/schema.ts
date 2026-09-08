@@ -72,6 +72,14 @@ export default defineSchema({
     .index('by_client', ['clientSlug'])
     .index('by_meta', ['metaId']),
 
+  // Accès temporaires aux sous-comptes GHL générés depuis le token agence
+  // (GHL_AGENCY_TOKEN → POST /oauth/locationToken), renouvelés à expiration.
+  ghlLocationTokens: defineTable({
+    locationId: v.string(),
+    token: v.string(),
+    expiresAt: v.string(),
+  }).index('by_location', ['locationId']),
+
   // Créatives (ads) d'une campagne Meta, avec miniature.
   ads: defineTable({
     campaignId: v.string(),

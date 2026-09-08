@@ -68,12 +68,133 @@ export function describeAttribution(
   return { source, medium: session || medium || '—' }
 }
 
+// Token statique connu pour un sous-compte : GHL_TOKEN_<locationId> (intégration
+// privée créée dans ce sous-compte) sinon le token par défaut (ECOI).
 export function tokenFor(locationId: string): string | undefined {
   return (
     (locationId ? process.env[`GHL_TOKEN_${locationId}`] : undefined) ??
     process.env.GHL_PRIVATE_INTEGRATION_TOKEN
   )
 }
+
+// Marge avant expiration d'un accès sous-compte généré (GHL donne ~24 h).
+const TOKEN_MARGIN_MS = 10 * 60_000
+
+// Token à utiliser pour un sous-compte, dans l'ordre :
+//  1. GHL_TOKEN_<locationId> (intégration privée du sous-compte) ;
+//  2. GHL_AGENCY_TOKEN (intégration privée AGENCE, scope oauth.write) : accès
+//     au sous-compte généré via /oauth/locationToken et mis en cache ;
+//  3. GHL_PRIVATE_INTEGRATION_TOKEN (token par défaut, sous-compte ECOI).
+export async function resolveToken(
+  ctx: ActionCtx,
+  locationId: string,
+): Promise<string | undefined> {
+  const dedicated = locationId
+    ? process.env[`GHL_TOKEN_${locationId}`]
+    : undefined
+  if (dedicated) return dedicated
+
+  const agency = process.env.GHL_AGENCY_TOKEN
+  if (agency && locationId) {
+    const cached = await ctx.runQuery(internal.ghl.cachedLocationToken, {
+      locationId,
+    })
+    if (cached) return cached
+    try {
+      const minted = await mintLocationToken(agency, locationId)
+      await ctx.runMutation(internal.ghl.storeLocationToken, {
+        locationId,
+        token: minted.token,
+        expiresAt: minted.expiresAt,
+      })
+      return minted.token
+    } catch (e) {
+      console.error(`Accès agence au sous-compte ${locationId} refusé :`, e)
+    }
+  }
+  return process.env.GHL_PRIVATE_INTEGRATION_TOKEN
+}
+
+async function ghlGet(token: string, path: string) {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Version: API_VERSION,
+      Accept: 'application/json',
+    },
+    signal: AbortSignal.timeout(15_000),
+  })
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok)
+    throw new Error(
+      `GHL ${res.status} sur ${path} : ${str(data.message) || str(data.error) || 'erreur inconnue'}`,
+    )
+  return data
+}
+
+// POST /oauth/locationToken : le token agence génère un accès au sous-compte.
+// companyId = GHL_AGENCY_COMPANY_ID sinon lu sur la fiche du sous-compte.
+async function mintLocationToken(
+  agencyToken: string,
+  locationId: string,
+): Promise<{ token: string; expiresAt: string }> {
+  let companyId = process.env.GHL_AGENCY_COMPANY_ID ?? ''
+  if (!companyId) {
+    const loc = await ghlGet(agencyToken, `/locations/${locationId}`)
+    companyId = str(obj(loc.location).companyId)
+    if (!companyId)
+      throw new Error(
+        'companyId introuvable : renseigne GHL_AGENCY_COMPANY_ID (ID de l’agence) dans Convex.',
+      )
+  }
+  const res = await fetch(`${BASE_URL}/oauth/locationToken`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${agencyToken}`,
+      Version: API_VERSION,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: new URLSearchParams({ companyId, locationId }).toString(),
+    signal: AbortSignal.timeout(15_000),
+  })
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok || !str(data.access_token))
+    throw new Error(
+      `GHL ${res.status} sur /oauth/locationToken : ${str(data.message) || str(data.error) || 'erreur inconnue'} (le token agence a-t-il le scope oauth.write ?)`,
+    )
+  const ttl =
+    typeof data.expires_in === 'number' ? data.expires_in * 1000 : 86_400_000
+  return {
+    token: str(data.access_token),
+    expiresAt: new Date(Date.now() + ttl - TOKEN_MARGIN_MS).toISOString(),
+  }
+}
+
+export const cachedLocationToken = internalQuery({
+  args: { locationId: v.string() },
+  handler: async (ctx, { locationId }) => {
+    const row = await ctx.db
+      .query('ghlLocationTokens')
+      .withIndex('by_location', (q) => q.eq('locationId', locationId))
+      .unique()
+    if (!row || row.expiresAt <= new Date().toISOString()) return null
+    return row.token
+  },
+})
+
+export const storeLocationToken = internalMutation({
+  args: { locationId: v.string(), token: v.string(), expiresAt: v.string() },
+  handler: async (ctx, { locationId, token, expiresAt }) => {
+    const row = await ctx.db
+      .query('ghlLocationTokens')
+      .withIndex('by_location', (q) => q.eq('locationId', locationId))
+      .unique()
+    if (row) await ctx.db.patch(row._id, { token, expiresAt })
+    else
+      await ctx.db.insert('ghlLocationTokens', { locationId, token, expiresAt })
+  },
+})
 
 // Fiche complète d'un contact (attribution incluse) — sert au webhook quand
 // le payload GHL n'embarque pas l'attribution.
@@ -152,7 +273,7 @@ async function searchContacts(
     const message = str(data.message) || str(data.error) || 'erreur inconnue'
     if (res.status === 403 || res.status === 401)
       throw new Error(
-        `Le token GHL n'a pas accès à ce sous-compte (${res.status}). Crée une intégration privée dans ce sous-compte (Paramètres → Intégrations privées, scope Contacts lecture) et enregistre-la dans Convex sous GHL_TOKEN_${locationId}.`,
+        `Le token GHL n'a pas accès à ce sous-compte (${res.status}). Enregistre dans Convex soit le token de l'intégration privée AGENCE (GHL_AGENCY_TOKEN, scopes Contacts lecture + OAuth écriture), soit une intégration privée créée dans ce sous-compte (GHL_TOKEN_${locationId}).`,
       )
     throw new Error(`GHL ${res.status} : ${message}`)
   }
@@ -492,9 +613,10 @@ export const syncCampaign = internalAction({
     if (!campaign)
       return { ok: false, ...empty, error: 'Aucun sous-compte GHL rattaché.' }
 
-    const token = tokenFor(campaign.locationId)
+    const token = await resolveToken(ctx, campaign.locationId)
     if (!token) {
-      const error = 'Token GHL manquant (GHL_PRIVATE_INTEGRATION_TOKEN).'
+      const error =
+        'Token GHL manquant (GHL_AGENCY_TOKEN ou GHL_PRIVATE_INTEGRATION_TOKEN).'
       await ctx.runMutation(internal.ghl.markSync, {
         metaId,
         at: new Date().toISOString(),
@@ -635,10 +757,11 @@ export const syncClient = internalAction({
     const link = await ctx.runQuery(internal.ghl.clientGhl, { clientSlug })
     if (!link)
       return { ok: false, ...empty, error: 'Aucun sous-compte GHL rattaché.' }
-    const token = tokenFor(link.locationId)
+    const token = await resolveToken(ctx, link.locationId)
     const startedAt = new Date().toISOString()
     if (!token) {
-      const error = 'Token GHL manquant (GHL_PRIVATE_INTEGRATION_TOKEN).'
+      const error =
+        'Token GHL manquant (GHL_AGENCY_TOKEN ou GHL_PRIVATE_INTEGRATION_TOKEN).'
       await ctx.runMutation(internal.ghl.markClientSync, {
         clientSlug,
         at: startedAt,
