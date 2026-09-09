@@ -356,7 +356,11 @@ export function WebhookCard({
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const ghlUrl = key ? `${WEBHOOK_URL}?key=${key}` : ''
+  // Sur la page d'une campagne, l'adresse embarque la campagne : tout lead
+  // reçu par cette adresse y est rangé, quelle que soit son attribution.
+  const ghlUrl = key
+    ? `${WEBHOOK_URL}?key=${key}${campaignId ? `&campaign=${campaignId}` : ''}`
+    : ''
   const example = key
     ? JSON.stringify(
         {
@@ -388,15 +392,20 @@ export function WebhookCard({
             </strong>{' '}
             (campagne 1 → campagne 1, jamais dans une autre). Une campagne
             inconnue est créée automatiquement dans « Campagnes Meta » ; un lead
-            sans campagne ou déjà connu est ignoré.
+            sans campagne ou déjà connu est ignoré. Pour forcer une campagne,
+            utilise plutôt le webhook affiché sur la page de cette campagne.
           </>
         ) : (
           <>
-            Envoie les prospects de ce client en <code>POST</code> JSON sur
-            cette adresse (depuis n8n, Zapier…). Les leads GoHighLevel sont
-            aiguillés par leur attribution ; pour un envoi manuel, indique{' '}
-            <code>campaignId</code>. Les doublons (même téléphone ou email) sont
-            ignorés.
+            Webhook propre à cette campagne : colle l'adresse « GHL » ci-dessous
+            dans l'action « Webhook » d'un workflow GoHighLevel et{' '}
+            <strong className="text-[var(--sea-ink)]">
+              tout lead reçu par cette adresse est rangé ici
+            </strong>
+            , quelle que soit son attribution. Pour un envoi manuel (n8n,
+            Zapier…), un <code>POST</code> JSON avec <code>campaignId</code>{' '}
+            fait pareil. Les doublons (même téléphone ou email) sont ignorés ;
+            le bouton « Tester » de GHL est reconnu et n'ajoute pas de prospect.
           </>
         )}
       </p>
@@ -571,6 +580,14 @@ export function WebhookCard({
                 </div>
               )}
             </>
+          )}
+          {!ghlGuide && campaignId && (
+            <Row
+              label="GHL"
+              value={ghlUrl}
+              copied={copied === 'ghlUrl'}
+              onCopy={() => copy('ghlUrl', ghlUrl)}
+            />
           )}
           {!ghlGuide && (
             <div>
