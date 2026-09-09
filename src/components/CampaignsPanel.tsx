@@ -183,7 +183,7 @@ function CampaignRow({ campaign: c }: { campaign: CampaignItem }) {
       <Link
         to="/campagnes/$campaignId"
         params={{ campaignId: c.metaId }}
-        className={`group flex flex-col gap-3 rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.015)] px-3.5 py-3 no-underline transition-colors hover:border-[var(--lagoon-line)] hover:bg-[var(--lagoon-tint)] ${active ? '' : 'opacity-80 hover:opacity-100'}`}
+        className={`group flex flex-col rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.015)] px-3.5 py-3 no-underline transition-colors hover:border-[var(--lagoon-line)] hover:bg-[var(--lagoon-tint)] ${active ? '' : 'opacity-80 hover:opacity-100'}`}
       >
         <div className="flex items-center gap-3">
           <span className="icon-chip">
@@ -234,53 +234,6 @@ function CampaignRow({ campaign: c }: { campaign: CampaignItem }) {
           </span>
           <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-[var(--sea-ink-faint)] transition-colors group-hover:text-[var(--lagoon)]" />
         </div>
-
-        {/* Publicités de la campagne, toujours visibles (même campagne en pause) */}
-        {ads.length > 0 ? (
-          <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0 pl-11">
-            {ads.slice(0, 8).map((a) => {
-              const st = statusLabel(a.status)
-              return (
-                <li
-                  key={a.adId}
-                  className="flex max-w-56 items-center gap-1.5 rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] py-1 pl-1 pr-2 text-[11px] text-[var(--sea-ink-soft)]"
-                  title={`${a.name}${st ? ` · ${st.label}` : ''}`}
-                >
-                  {a.thumbnailUrl ? (
-                    <img
-                      src={a.thumbnailUrl}
-                      alt=""
-                      loading="lazy"
-                      className="h-6 w-6 flex-shrink-0 rounded-md object-cover"
-                    />
-                  ) : (
-                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[rgba(255,255,255,0.04)]">
-                      <MegaphoneIcon className="h-3 w-3" />
-                    </span>
-                  )}
-                  <span className="truncate">{a.name}</span>
-                  <span
-                    className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                    style={{ background: st?.color ?? 'var(--status-muted)' }}
-                    aria-hidden="true"
-                  />
-                </li>
-              )
-            })}
-            {ads.length > 8 && (
-              <li className="flex items-center rounded-lg border border-dashed border-[var(--line)] px-2 py-1 text-[11px] text-[var(--sea-ink-faint)]">
-                +{ads.length - 8}
-              </li>
-            )}
-          </ul>
-        ) : (
-          c.lastSyncedAt &&
-          !c.syncError && (
-            <p className="m-0 pl-11 text-[11px] text-[var(--sea-ink-faint)]">
-              Aucune publicité dans cette campagne.
-            </p>
-          )
-        )}
       </Link>
     </li>
   )
