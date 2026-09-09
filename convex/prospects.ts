@@ -1,4 +1,4 @@
-import { mutation, query } from './_generated/server'
+import { internalMutation, mutation, query } from './_generated/server'
 import type { MutationCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { requireUser } from './guard'
@@ -174,6 +174,14 @@ export const remove = mutation({
   args: { id: v.id('prospects') },
   handler: async (ctx, { id }) => {
     await requireUser(ctx)
+    await ctx.db.delete(id)
+  },
+})
+
+// Suppression depuis la CLI (nettoyage de prospects de test), sans session.
+export const removeInternal = internalMutation({
+  args: { id: v.id('prospects') },
+  handler: async (ctx, { id }) => {
     await ctx.db.delete(id)
   },
 })
