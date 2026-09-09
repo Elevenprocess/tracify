@@ -78,7 +78,7 @@ export const patchAdAccount = internalMutation({
 })
 
 // Création avec compte publicitaire : le compte est validé auprès de Meta,
-// puis toutes ses campagnes actives sont rattachées automatiquement.
+// puis toutes ses campagnes (actives et inactives) sont rattachées automatiquement.
 export const createChecked = action({
   args: {
     name: v.string(),

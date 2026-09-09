@@ -1,9 +1,10 @@
+import type React from 'react'
 import KpiCard from './KpiCard'
 import LineChart from './charts/LineChart'
 import { COLUMNS } from './ProspectsBoard'
 import type { Prospect } from './ProspectsBoard'
 import type { CampaignDetailData } from './CampaignOverview'
-import { STATUS_LABELS } from './CampaignOverview'
+import { isActiveStatus, statusLabel } from './CampaignOverview'
 import {
   ChevronRightIcon,
   InboxIcon,
@@ -61,6 +62,87 @@ export default function ClientOverview({
         p.campaignId,
         (prospectsByCampaign.get(p.campaignId) ?? 0) + 1,
       )
+
+  const active = campaigns.filter((c) => isActiveStatus(c.status))
+  const inactive = campaigns.filter((c) => !isActiveStatus(c.status))
+  const renderCard = (c: CampaignDetailData) => {
+    const status = statusLabel(c.status)
+    const nProspects = prospectsByCampaign.get(c.metaId) ?? 0
+    return (
+      <li key={c.metaId}>
+        <article className="island-shell rise-in flex h-full flex-col rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="m-0 truncate text-sm font-bold text-[var(--sea-ink)]">
+                {c.name}
+              </h3>
+              <p className="m-0 mt-0.5 text-xs text-[var(--sea-ink-soft)]">
+                {c.creatives.length} créative
+                {c.creatives.length > 1 ? 's' : ''} · 30 derniers jours
+              </p>
+            </div>
+            {status && (
+              <span className="demo-pill whitespace-nowrap">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: status.color }}
+                  aria-hidden="true"
+                />
+                {status.label}
+              </span>
+            )}
+          </div>
+          <dl className="m-0 mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl border border-[var(--line)] px-2 py-2">
+              <dt className="text-[10px] font-bold uppercase tracking-wide text-[var(--sea-ink-faint)]">
+                Dépense
+              </dt>
+              <dd className="tabular m-0 mt-0.5 text-base font-extrabold text-[var(--sea-ink)]">
+                {formatEuro(c.totals.spend)}
+              </dd>
+            </div>
+            <div className="rounded-xl border border-[var(--line)] px-2 py-2">
+              <dt className="text-[10px] font-bold uppercase tracking-wide text-[var(--sea-ink-faint)]">
+                Prospects
+              </dt>
+              <dd className="tabular m-0 mt-0.5 text-base font-extrabold text-[var(--sea-ink)]">
+                {formatNumber(c.totals.leads)}
+              </dd>
+            </div>
+            <div className="rounded-xl border border-[var(--line)] px-2 py-2">
+              <dt className="text-[10px] font-bold uppercase tracking-wide text-[var(--sea-ink-faint)]">
+                Coût / prospect
+              </dt>
+              <dd className="tabular m-0 mt-0.5 text-base font-extrabold text-[var(--sea-ink)]">
+                {c.totals.cpl !== null ? formatEuro(c.totals.cpl) : '—'}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onSelectCampaign(c.metaId, 'performance')}
+              className="btn btn-secondary btn-sm"
+            >
+              Performance & créatives
+              <ChevronRightIcon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectCampaign(c.metaId, 'prospects')}
+              className="btn btn-ghost btn-sm"
+            >
+              <UsersIcon className="h-3.5 w-3.5" />
+              Prospects
+              <span className="tabular rounded-md bg-[var(--surface-strong)] px-1.5 py-0.5 text-[11px] font-bold">
+                {nProspects}
+              </span>
+            </button>
+          </div>
+        </article>
+      </li>
+    )
+  }
 
   return (
     <>
@@ -175,7 +257,7 @@ export default function ClientOverview({
         </article>
       </section>
 
-      {/* Campagnes */}
+      {/* Campagnes : actives, puis inactives en dessous */}
       <section className="mt-6">
         <SectionTitle icon={<MegaphoneIcon className="h-4 w-4" />}>
           Vos campagnes
@@ -184,91 +266,26 @@ export default function ClientOverview({
           </span>
         </SectionTitle>
         {campaigns.length > 0 ? (
-          <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2">
-            {campaigns.map((c) => {
-              const status = c.status ? STATUS_LABELS[c.status] : undefined
-              const nProspects = prospectsByCampaign.get(c.metaId) ?? 0
-              return (
-                <li key={c.metaId}>
-                  <article className="island-shell rise-in flex h-full flex-col rounded-2xl p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="m-0 truncate text-sm font-bold text-[var(--sea-ink)]">
-                          {c.name}
-                        </h3>
-                        <p className="m-0 mt-0.5 text-xs text-[var(--sea-ink-soft)]">
-                          {c.creatives.length} créative
-                          {c.creatives.length > 1 ? 's' : ''} · 30 derniers
-                          jours
-                        </p>
-                      </div>
-                      {status && (
-                        <span className="demo-pill whitespace-nowrap">
-                          <span
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ background: status.color }}
-                            aria-hidden="true"
-                          />
-                          {status.label}
-                        </span>
-                      )}
-                    </div>
-                    <dl className="m-0 mt-4 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-xl border border-[var(--line)] px-2 py-2">
-                        <dt className="text-[10px] font-bold uppercase tracking-wide text-[var(--sea-ink-faint)]">
-                          Dépense
-                        </dt>
-                        <dd className="tabular m-0 mt-0.5 text-base font-extrabold text-[var(--sea-ink)]">
-                          {formatEuro(c.totals.spend)}
-                        </dd>
-                      </div>
-                      <div className="rounded-xl border border-[var(--line)] px-2 py-2">
-                        <dt className="text-[10px] font-bold uppercase tracking-wide text-[var(--sea-ink-faint)]">
-                          Prospects
-                        </dt>
-                        <dd className="tabular m-0 mt-0.5 text-base font-extrabold text-[var(--sea-ink)]">
-                          {formatNumber(c.totals.leads)}
-                        </dd>
-                      </div>
-                      <div className="rounded-xl border border-[var(--line)] px-2 py-2">
-                        <dt className="text-[10px] font-bold uppercase tracking-wide text-[var(--sea-ink-faint)]">
-                          Coût / prospect
-                        </dt>
-                        <dd className="tabular m-0 mt-0.5 text-base font-extrabold text-[var(--sea-ink)]">
-                          {c.totals.cpl !== null
-                            ? formatEuro(c.totals.cpl)
-                            : '—'}
-                        </dd>
-                      </div>
-                    </dl>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onSelectCampaign(c.metaId, 'performance')
-                        }
-                        className="btn btn-secondary btn-sm"
-                      >
-                        Performance & créatives
-                        <ChevronRightIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSelectCampaign(c.metaId, 'prospects')}
-                        className="btn btn-ghost btn-sm"
-                      >
-                        <UsersIcon className="h-3.5 w-3.5" />
-                        Prospects
-                        <span className="tabular rounded-md bg-[var(--surface-strong)] px-1.5 py-0.5 text-[11px] font-bold">
-                          {nProspects}
-                        </span>
-                      </button>
-                    </div>
-                  </article>
-                </li>
-              )
-            })}
-          </ul>
+          <>
+            <CampaignGroup
+              title="Actives"
+              tone="var(--status-good)"
+              count={active.length}
+              empty="Aucune campagne active en ce moment."
+            >
+              {active.map(renderCard)}
+            </CampaignGroup>
+            <CampaignGroup
+              title="Inactives"
+              tone="var(--status-muted)"
+              hint="En pause ou terminées — leurs créatives et résultats restent consultables."
+              count={inactive.length}
+              empty="Aucune campagne inactive."
+              className="mt-5"
+            >
+              {inactive.map(renderCard)}
+            </CampaignGroup>
+          </>
         ) : (
           <div className="island-shell rounded-2xl">
             <EmptyState
@@ -288,5 +305,51 @@ export default function ClientOverview({
         </p>
       )}
     </>
+  )
+}
+
+function CampaignGroup({
+  title,
+  tone,
+  hint,
+  count,
+  empty,
+  className = '',
+  children,
+}: {
+  title: string
+  tone: string
+  hint?: string
+  count: number
+  empty: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={className}>
+      <p className="island-kicker m-0 mb-2 flex items-center gap-2">
+        <span
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ background: tone }}
+          aria-hidden="true"
+        />
+        {title}
+        <span className="tabular text-[var(--sea-ink-faint)]">{count}</span>
+        {hint && (
+          <span className="ml-1 font-normal normal-case tracking-normal text-[var(--sea-ink-faint)]">
+            {hint}
+          </span>
+        )}
+      </p>
+      {count === 0 ? (
+        <p className="m-0 rounded-xl border border-dashed border-[var(--line)] px-3.5 py-2.5 text-xs text-[var(--sea-ink-faint)]">
+          {empty}
+        </p>
+      ) : (
+        <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2">
+          {children}
+        </ul>
+      )}
+    </div>
   )
 }

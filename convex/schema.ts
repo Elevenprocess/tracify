@@ -14,7 +14,7 @@ export default defineSchema({
     // 'project' = projet propre d'Erwan ; 'client' = client externe qui
     // commande des publicités. Absent = client.
     kind: v.optional(v.union(v.literal('client'), v.literal('project'))),
-    // Compte publicitaire Meta (act_…) : ses campagnes actives sont
+    // Compte publicitaire Meta (act_…) : ses campagnes (actives et inactives) sont
     // détectées et rattachées automatiquement.
     adAccountId: v.optional(v.string()),
     sector: v.optional(v.string()),

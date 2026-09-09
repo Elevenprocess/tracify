@@ -26,6 +26,28 @@ export type CampaignDetailData = NonNullable<
 export const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   ACTIVE: { label: 'Active', color: 'var(--status-good)' },
   PAUSED: { label: 'En pause', color: 'var(--status-warn)' },
+  CAMPAIGN_PAUSED: { label: 'Campagne en pause', color: 'var(--status-warn)' },
+  ADSET_PAUSED: { label: 'Ensemble en pause', color: 'var(--status-warn)' },
+  IN_PROCESS: { label: 'En traitement', color: 'var(--status-warn)' },
+  PENDING_REVIEW: { label: 'En examen', color: 'var(--status-warn)' },
+  WITH_ISSUES: { label: 'Avec problèmes', color: 'var(--status-warn)' },
+  DISAPPROVED: { label: 'Refusée', color: 'var(--status-warn)' },
+  ARCHIVED: { label: 'Archivée', color: 'var(--status-muted)' },
+  DELETED: { label: 'Supprimée', color: 'var(--status-muted)' },
+}
+
+// Une campagne / créative est « active » quand Meta la diffuse. Statut
+// inconnu (pas encore synchronisée) = considérée active pour ne pas la
+// ranger à tort dans les inactives.
+export function isActiveStatus(status: string | null | undefined): boolean {
+  return !status || status === 'ACTIVE'
+}
+
+export function statusLabel(status: string | null | undefined) {
+  if (!status) return undefined
+  return (
+    STATUS_LABELS[status] ?? { label: status, color: 'var(--status-muted)' }
+  )
 }
 
 // Vue d'ensemble d'une campagne : KPIs, courbes quotidiennes et tableau des
@@ -115,7 +137,8 @@ export default function CampaignOverview({
             data.creatives.length > 0 && (
               <span className="text-xs text-[var(--sea-ink-faint)]">
                 {formatNumber(data.creatives.length)} créative
-                {data.creatives.length > 1 ? 's' : ''} · triées par dépense
+                {data.creatives.length > 1 ? 's' : ''} · toutes les publicités
+                de la campagne, triées par dépense
               </span>
             )
           }
@@ -139,9 +162,7 @@ export default function CampaignOverview({
               </thead>
               <tbody>
                 {data.creatives.map((c, i) => {
-                  const adStatus = c.status
-                    ? STATUS_LABELS[c.status]
-                    : undefined
+                  const adStatus = statusLabel(c.status)
                   const best = i === 0 && c.leads > 0
                   return (
                     <tr key={c.adId}>
@@ -207,8 +228,8 @@ export default function CampaignOverview({
           ) : (
             <EmptyState
               icon={<MegaphoneIcon className="h-4 w-4" />}
-              title="Aucune créative synchronisée pour l'instant"
-              hint="La prochaine synchronisation (toutes les 6 h) les fera apparaître avec leurs miniatures."
+              title="Aucune publicité dans cette campagne"
+              hint="Les créatives apparaissent dès la première synchronisation (toutes les 6 h), qu'elles aient dépensé ou non."
             />
           )}
         </div>

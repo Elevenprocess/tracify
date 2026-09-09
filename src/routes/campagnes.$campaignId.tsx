@@ -2,7 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import AppShell from '../components/AppShell'
-import CampaignOverview, { STATUS_LABELS } from '../components/CampaignOverview'
+import CampaignOverview, { statusLabel } from '../components/CampaignOverview'
 import ProspectsBoard from '../components/ProspectsBoard'
 import { AlertIcon, WebhookIcon } from '../components/icons'
 import RequireAuth from '../components/RequireAuth'
@@ -50,7 +50,7 @@ function CampaignDetail() {
     )
   }
 
-  const status = data.status ? STATUS_LABELS[data.status] : undefined
+  const status = statusLabel(data.status)
 
   return (
     <main className="min-w-0">

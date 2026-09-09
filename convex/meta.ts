@@ -168,6 +168,46 @@ async function fetchAdDetails(adIds: Array<string>) {
   return out
 }
 
+// Toutes les publicités d'une campagne (nom, statut, miniature), qu'elles
+// aient dépensé ou non : c'est ce qui permet d'afficher les créatives d'une
+// campagne en pause ou terminée.
+async function fetchCampaignAds(metaId: string) {
+  const params = new URLSearchParams({
+    fields: 'name,effective_status,creative{thumbnail_url}',
+    limit: '200',
+    access_token: metaAccessToken(),
+  })
+  const out: Array<{
+    adId: string
+    name?: string
+    status?: string
+    thumbnailUrl?: string
+  }> = []
+  let url: string | undefined = `${GRAPH_BASE}/${metaId}/ads?${params}`
+  while (url) {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text()}`)
+    const json = (await res.json()) as {
+      data?: Array<{
+        id: string
+        name?: string
+        effective_status?: string
+        creative?: { thumbnail_url?: string }
+      }>
+      paging?: { next?: string }
+    }
+    for (const a of json.data ?? [])
+      out.push({
+        adId: a.id,
+        name: a.name,
+        status: a.effective_status,
+        thumbnailUrl: a.creative?.thumbnail_url,
+      })
+    url = json.paging?.next
+  }
+  return out
+}
+
 // Upsert idempotent des lignes quotidiennes d'une campagne.
 export const saveDaily = internalMutation({
   args: {
@@ -333,19 +373,33 @@ export const syncCampaign = internalAction({
           rows: adRows.slice(i, i + 100).map(({ adName: _adName, ...r }) => r),
         })
       }
-      const namesById = new Map<string, string>()
-      for (const r of adRows) namesById.set(r.adId, r.adName)
-      const adIds = [...namesById.keys()]
-      const details = await fetchAdDetails(adIds)
-      await ctx.runMutation(internal.meta.upsertAds, {
-        campaignId: metaId,
-        ads: adIds.map((adId) => ({
-          adId,
-          name: namesById.get(adId),
-          status: details.get(adId)?.status,
-          thumbnailUrl: details.get(adId)?.thumbnailUrl,
-        })),
-      })
+      // Fiches créatives : la liste complète des publicités de la campagne
+      // (même sans dépense), complétée par celles vues dans les stats.
+      const adsById = new Map<
+        string,
+        { adId: string; name?: string; status?: string; thumbnailUrl?: string }
+      >()
+      for (const a of await fetchCampaignAds(metaId)) adsById.set(a.adId, a)
+      const missing: Array<string> = []
+      for (const r of adRows) {
+        if (adsById.has(r.adId)) continue
+        adsById.set(r.adId, { adId: r.adId, name: r.adName })
+        missing.push(r.adId)
+      }
+      if (missing.length > 0) {
+        const details = await fetchAdDetails(missing)
+        for (const adId of missing) {
+          const d = details.get(adId)
+          if (d) Object.assign(adsById.get(adId)!, d)
+        }
+      }
+      const adList = [...adsById.values()]
+      for (let i = 0; i < adList.length; i += 100) {
+        await ctx.runMutation(internal.meta.upsertAds, {
+          campaignId: metaId,
+          ads: adList.slice(i, i + 100),
+        })
+      }
 
       await ctx.runMutation(internal.meta.patchCampaign, {
         id,
@@ -418,7 +472,7 @@ export const assertAdAccount = internalAction({
 // Rattachement automatique du compte publicitaire depuis un lead GHL : la
 // campagne Meta de l'attribution permet de retrouver son compte (act_…) ;
 // s'il est accessible avec le token et que le client n'en a pas encore, on
-// le pose et on lance la détection de toutes ses campagnes actives.
+// le pose et on lance la détection de toutes ses campagnes (actives et inactives).
 export const linkAccountFromCampaign = internalAction({
   args: { clientSlug: v.string(), metaId: v.string() },
   handler: async (
@@ -482,8 +536,12 @@ export const listClientsWithAccounts = internalQuery({
   },
 })
 
-// Détecte les campagnes ACTIVES d'un compte publicitaire et rattache
-// automatiquement celles qui ne le sont pas encore (sync incluse).
+// Statuts Meta qu'on ne rattache pas : supprimée ou archivée côté Meta.
+const HIDDEN_CAMPAIGN_STATUSES = new Set(['DELETED', 'ARCHIVED'])
+
+// Détecte les campagnes d'un compte publicitaire (actives ET inactives, hors
+// supprimées/archivées) et rattache automatiquement celles qui ne le sont
+// pas encore (sync incluse).
 export const discoverCampaigns = internalAction({
   args: { clientSlug: v.string(), account: v.string() },
   handler: async (ctx, { clientSlug, account }) => {
@@ -511,7 +569,11 @@ export const discoverCampaigns = internalAction({
 
     let added = 0
     for (const c of found) {
-      if (c.effective_status !== 'ACTIVE') continue
+      if (
+        c.effective_status &&
+        HIDDEN_CAMPAIGN_STATUSES.has(c.effective_status)
+      )
+        continue
       const exists = await ctx.runQuery(internal.meta.campaignExists, {
         metaId: c.id,
       })
@@ -564,17 +626,38 @@ export const campaignsByClient = query({
       .query('campaigns')
       .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
       .collect()
-    return rows
-      .map((c) => ({
-        id: c._id,
-        metaId: c.metaId,
-        name: c.name ?? null,
-        status: c.status ?? null,
-        lastSyncedAt: c.lastSyncedAt ?? null,
-        syncError: c.syncError ?? null,
-        origin: c.origin ?? null,
-      }))
-      .sort((a, b) => (a.name ?? a.metaId).localeCompare(b.name ?? b.metaId))
+    const withAds = await Promise.all(
+      rows.map(async (c) => {
+        const ads = await ctx.db
+          .query('ads')
+          .withIndex('by_campaign', (q) => q.eq('campaignId', c.metaId))
+          .collect()
+        return {
+          id: c._id,
+          metaId: c.metaId,
+          name: c.name ?? null,
+          status: c.status ?? null,
+          lastSyncedAt: c.lastSyncedAt ?? null,
+          syncError: c.syncError ?? null,
+          origin: c.origin ?? null,
+          ads: ads
+            .map((a) => ({
+              adId: a.adId,
+              name: a.name ?? `Créative ${a.adId}`,
+              status: a.status ?? null,
+              thumbnailUrl: a.thumbnailUrl ?? null,
+            }))
+            .sort((a, b) => {
+              const aa = a.status === 'ACTIVE' ? 0 : 1
+              const bb = b.status === 'ACTIVE' ? 0 : 1
+              return aa - bb || a.name.localeCompare(b.name)
+            }),
+        }
+      }),
+    )
+    return withAds.sort((a, b) =>
+      (a.name ?? a.metaId).localeCompare(b.name ?? b.metaId),
+    )
   },
 })
 
@@ -792,6 +875,11 @@ export async function buildCampaignDetail(ctx: QueryCtx, metaId: string) {
     const leads = recent.reduce((s, r) => s + r.leads, 0)
 
     const adInfo = new Map(ads.map((a) => [a.adId, a]))
+    // Toutes les créatives connues figurent dans le tableau, même sans
+    // dépense sur 30 jours (campagne en pause, publicité jamais diffusée…).
+    for (const a of ads)
+      if (!byAd.has(a.adId))
+        byAd.set(a.adId, { spend: 0, impressions: 0, clicks: 0, leads: 0 })
 
     return {
       metaId,
@@ -836,7 +924,12 @@ export async function buildCampaignDetail(ctx: QueryCtx, metaId: string) {
             cpl: agg.leads > 0 ? agg.spend / agg.leads : null,
           }
         })
-        .sort((a, b) => b.spend - a.spend),
+        .sort(
+          (a, b) =>
+            b.spend - a.spend ||
+            (a.status === 'ACTIVE' ? 0 : 1) - (b.status === 'ACTIVE' ? 0 : 1) ||
+            a.name.localeCompare(b.name),
+        ),
     }
   }
 }

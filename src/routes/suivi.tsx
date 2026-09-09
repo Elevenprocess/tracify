@@ -3,7 +3,10 @@ import type { ReactNode } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
-import CampaignOverview, { STATUS_LABELS } from '../components/CampaignOverview'
+import CampaignOverview, {
+  isActiveStatus,
+  statusLabel,
+} from '../components/CampaignOverview'
 import { PipelineBoard } from '../components/ProspectsBoard'
 import { EmptyState, PageSkeleton } from '../components/ui'
 import {
@@ -221,9 +224,13 @@ function SuiviView({
     section.kind === 'campaign'
       ? data.campaigns.find((c) => c.metaId === section.metaId)
       : undefined
-  const status = campaign?.status ? STATUS_LABELS[campaign.status] : undefined
+  const status = statusLabel(campaign?.status)
   const campaignNames = Object.fromEntries(
     data.campaigns.map((c) => [c.metaId, c.name]),
+  )
+  const sideCampaigns = data.campaigns.filter((c) => isActiveStatus(c.status))
+  const inactiveCampaigns = data.campaigns.filter(
+    (c) => !isActiveStatus(c.status),
   )
   const go = (next: Section) => {
     setSection(next)
@@ -290,8 +297,8 @@ function SuiviView({
               </span>
             </p>
             <div className="flex flex-col gap-0.5">
-              {data.campaigns.map((c) => {
-                const st = c.status ? STATUS_LABELS[c.status] : undefined
+              {sideCampaigns.map((c) => {
+                const st = statusLabel(c.status)
                 return (
                   <SideButton
                     key={c.metaId}
@@ -313,6 +320,44 @@ function SuiviView({
                   </SideButton>
                 )
               })}
+              {inactiveCampaigns.length > 0 && (
+                <>
+                  <p className="m-0 mb-1 mt-3 px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--sea-ink-faint)]">
+                    Inactives
+                    <span className="tabular ml-1.5">
+                      {inactiveCampaigns.length}
+                    </span>
+                  </p>
+                  {inactiveCampaigns.map((c) => {
+                    const st = statusLabel(c.status)
+                    return (
+                      <SideButton
+                        key={c.metaId}
+                        active={
+                          section.kind === 'campaign' &&
+                          section.metaId === c.metaId
+                        }
+                        onClick={() =>
+                          go({ kind: 'campaign', metaId: c.metaId })
+                        }
+                      >
+                        <MegaphoneIcon className="h-4 w-4 flex-shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {c.name}
+                        </span>
+                        {st && (
+                          <span
+                            className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                            style={{ background: st.color }}
+                            aria-hidden="true"
+                            title={st.label}
+                          />
+                        )}
+                      </SideButton>
+                    )
+                  })}
+                </>
+              )}
               {data.campaigns.length === 0 && (
                 <p className="m-0 px-3 py-1 text-xs text-[var(--sea-ink-faint)]">
                   Aucune campagne pour l'instant.
