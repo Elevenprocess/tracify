@@ -405,7 +405,8 @@ export function WebhookCard({
             , quelle que soit son attribution. Pour un envoi manuel (n8n,
             Zapier…), un <code>POST</code> JSON avec <code>campaignId</code>{' '}
             fait pareil. Les doublons (même téléphone ou email) sont ignorés ;
-            le bouton « Tester » de GHL est reconnu et n'ajoute pas de prospect.
+            le bouton « Tester » de GHL ajoute une carte « Test GHL » à chaque
+            clic, preuve que le branchement fonctionne.
           </>
         )}
       </p>

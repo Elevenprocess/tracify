@@ -141,7 +141,7 @@ const OUTCOME_LABEL: Record<Outcome, string> = {
   duplicate: 'déjà connu',
   'no-campaign': 'ignoré : aucune campagne Meta dans son attribution',
   'other-client': 'ignoré : campagne rattachée à un autre client',
-  test: 'test GHL reçu, le webhook est bien branché (données factices non importées)',
+  test: 'test GHL reçu, prospect « Test GHL » ajouté dans la campagne',
 }
 
 async function recordWebhook(
@@ -163,7 +163,8 @@ async function recordWebhook(
       : OUTCOME_LABEL[outcome],
     webhookCounts: {
       received: c.received + 1,
-      imported: c.imported + (outcome === 'imported' ? 1 : 0),
+      imported:
+        c.imported + (outcome === 'imported' || outcome === 'test' ? 1 : 0),
       duplicates: c.duplicates + (outcome === 'duplicate' ? 1 : 0),
       noCampaign:
         c.noCampaign +
@@ -185,8 +186,10 @@ export const ingest = internalMutation({
     campaignName: v.optional(v.string()),
     date: v.optional(v.string()),
     ghlContactId: v.optional(v.string()),
-    // Envoi du bouton « Tester » de GHL (données factices) : on note la
-    // réception pour prouver le branchement, sans créer de prospect.
+    // Envoi du bouton « Tester » de GHL (données factices) : importé comme
+    // un vrai prospect « Test GHL » (demande Mario : le test doit toujours
+    // faire apparaître une carte), sans dédoublonnage pour que chaque clic
+    // ajoute une carte.
     test: v.optional(v.boolean()),
   },
   handler: async (ctx, a) => {
@@ -198,17 +201,8 @@ export const ingest = internalMutation({
 
     const name = a.name.trim()
 
-    if (a.test) {
-      await recordWebhook(ctx, client, 'test', name)
-      return {
-        ok: true as const,
-        skipped: 'test' as const,
-        reason: OUTCOME_LABEL.test,
-      }
-    }
-
     // Déjà reçu (même contact GHL) → rien à faire.
-    if (a.ghlContactId) {
+    if (!a.test && a.ghlContactId) {
       const known = await ctx.db
         .query('prospects')
         .withIndex('by_ghl', (q) => q.eq('ghlContactId', a.ghlContactId))
@@ -239,10 +233,13 @@ export const ingest = internalMutation({
     }
     const campaignId = routed.metaId
 
-    // Anti-doublon : même téléphone ou email déjà présent chez ce client.
+    // Anti-doublon : même téléphone ou email déjà présent chez ce client
+    // (jamais pour un test GHL : chaque clic « Tester » ajoute une carte).
     const phone = a.phone?.trim() ?? ''
     const email = a.email?.trim().toLowerCase() || undefined
-    const dup = await findDuplicate(ctx, client.slug, phone, email)
+    const dup = a.test
+      ? null
+      : await findDuplicate(ctx, client.slug, phone, email)
     if (dup) {
       const patch: { ghlContactId?: string; campaignId?: string } = {}
       if (!dup.ghlContactId && a.ghlContactId)
@@ -273,7 +270,7 @@ export const ingest = internalMutation({
     await recordWebhook(
       ctx,
       client,
-      'imported',
+      a.test ? 'test' : 'imported',
       routed.created ? `${name} · nouvelle campagne détectée` : name,
     )
     return {
@@ -414,12 +411,24 @@ export const receive = httpAction(async (ctx, req) => {
     [name, phone, email].join(' '),
   )
 
+  // Données factices de GHL (« <test lead: dummy data for phone> »…) :
+  // remplacées par un nom lisible et daté, sans téléphone ni email.
+  const testName = `Test GHL ${new Date().toLocaleString('fr-FR', {
+    timeZone: 'Indian/Reunion',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`
+
   const result = await ctx.runMutation(internal.leads.ingest, {
     key,
-    name: name || phone || email,
-    phone: phone || undefined,
-    email: email || undefined,
-    source: str(body.source) || (hasAttr ? ghl.source : undefined),
+    name: isGhlTest ? testName : name || phone || email,
+    phone: isGhlTest ? undefined : phone || undefined,
+    email: isGhlTest ? undefined : email || undefined,
+    source: isGhlTest
+      ? 'Test GHL'
+      : str(body.source) || (hasAttr ? ghl.source : undefined),
     medium:
       str(body.medium) ||
       str(body.utm_medium) ||
@@ -427,7 +436,7 @@ export const receive = httpAction(async (ctx, req) => {
     campaignId: campaignId || undefined,
     campaignName: campaignName || undefined,
     date: str(body.date) || str(body.date_created) || undefined,
-    ghlContactId,
+    ghlContactId: isGhlTest ? undefined : ghlContactId,
     test: isGhlTest || undefined,
   })
   if (!result.ok) return json(result, 401)
