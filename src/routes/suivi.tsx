@@ -236,10 +236,13 @@ function SuiviView({
   const campaignNames = Object.fromEntries(
     data.campaigns.map((c) => [c.metaId, c.name]),
   )
-  const sideCampaigns = data.campaigns.filter((c) => isActiveStatus(c.status))
-  const inactiveCampaigns = data.campaigns.filter(
-    (c) => !isActiveStatus(c.status),
+  // Côté client, seules les campagnes ACTIVES sont visibles (demande Mario
+  // 10/09) ; les prospects rattachés à une campagne inactive restent dans le
+  // kanban, avec le nom de leur campagne (campaignNames couvre tout).
+  const visibleCampaigns = data.campaigns.filter((c) =>
+    isActiveStatus(c.status),
   )
+  const sideCampaigns = visibleCampaigns
   const go = (next: Section) => {
     setSection(next)
     setMenuOpen(false)
@@ -273,7 +276,7 @@ function SuiviView({
     section.kind === 'campaign'
       ? '30 derniers jours'
       : section.kind === 'overview'
-        ? `${data.campaigns.length} campagne${data.campaigns.length > 1 ? 's' : ''} · 30 derniers jours`
+        ? `${visibleCampaigns.length} campagne${visibleCampaigns.length > 1 ? 's' : ''} · 30 derniers jours`
         : section.kind === 'prospects'
           ? `${prospects.length} prospect${prospects.length > 1 ? 's' : ''}${fresh > 0 ? ` · ${fresh} nouveau${fresh > 1 ? 'x' : ''} (24 h)` : ''}`
           : documents
@@ -321,7 +324,7 @@ function SuiviView({
             <p className="island-kicker m-0 mb-2 flex items-center justify-between px-3">
               Campagnes
               <span className="tabular text-[var(--sea-ink-faint)]">
-                {data.campaigns.length}
+                {visibleCampaigns.length}
               </span>
             </p>
             <div className="flex flex-col gap-0.5">
@@ -348,45 +351,7 @@ function SuiviView({
                   </SideButton>
                 )
               })}
-              {inactiveCampaigns.length > 0 && (
-                <>
-                  <p className="m-0 mb-1 mt-3 px-3 text-[10px] font-bold uppercase tracking-wider text-[var(--sea-ink-faint)]">
-                    Inactives
-                    <span className="tabular ml-1.5">
-                      {inactiveCampaigns.length}
-                    </span>
-                  </p>
-                  {inactiveCampaigns.map((c) => {
-                    const st = statusLabel(c.status)
-                    return (
-                      <SideButton
-                        key={c.metaId}
-                        active={
-                          section.kind === 'campaign' &&
-                          section.metaId === c.metaId
-                        }
-                        onClick={() =>
-                          go({ kind: 'campaign', metaId: c.metaId })
-                        }
-                      >
-                        <MegaphoneIcon className="h-4 w-4 flex-shrink-0" />
-                        <span className="min-w-0 flex-1 truncate">
-                          {c.name}
-                        </span>
-                        {st && (
-                          <span
-                            className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                            style={{ background: st.color }}
-                            aria-hidden="true"
-                            title={st.label}
-                          />
-                        )}
-                      </SideButton>
-                    )
-                  })}
-                </>
-              )}
-              {data.campaigns.length === 0 && (
+              {visibleCampaigns.length === 0 && (
                 <p className="m-0 px-3 py-1 text-xs text-[var(--sea-ink-faint)]">
                   Aucune campagne pour l'instant.
                 </p>
@@ -470,7 +435,7 @@ function SuiviView({
 
           {section.kind === 'overview' && (
             <ClientOverview
-              campaigns={data.campaigns}
+              campaigns={visibleCampaigns}
               prospects={prospects}
               onSelectCampaign={(metaId, tab) =>
                 go(
@@ -520,10 +485,12 @@ function SuiviView({
             <>
               {/* Mobile : liste déroulante (la rangée de boutons prendrait
                   tout l'écran avec des dizaines de campagnes) */}
-              {data.campaigns.length > 0 && (
+              {visibleCampaigns.length > 0 && (
                 <label
                   className={`mb-3 flex items-center gap-2 text-xs font-semibold text-[var(--sea-ink-soft)] ${
-                    data.campaigns.length > MAX_FILTER_CHIPS ? '' : 'sm:hidden'
+                    visibleCampaigns.length > MAX_FILTER_CHIPS
+                      ? ''
+                      : 'sm:hidden'
                   }`}
                 >
                   Filtrer :
@@ -542,7 +509,7 @@ function SuiviView({
                     <option value="">
                       Toutes les campagnes ({prospects.length})
                     </option>
-                    {data.campaigns.map((c) => (
+                    {visibleCampaigns.map((c) => (
                       <option key={c.metaId} value={c.metaId}>
                         {c.name} (
                         {
@@ -555,10 +522,10 @@ function SuiviView({
                   </select>
                 </label>
               )}
-              {data.campaigns.length > 0 && (
+              {visibleCampaigns.length > 0 && (
                 <div
                   className={`mb-1 flex-wrap items-center gap-1.5 ${
-                    data.campaigns.length > MAX_FILTER_CHIPS
+                    visibleCampaigns.length > MAX_FILTER_CHIPS
                       ? 'hidden'
                       : 'hidden sm:flex'
                   }`}
@@ -577,7 +544,7 @@ function SuiviView({
                       {prospects.length}
                     </span>
                   </button>
-                  {data.campaigns.map((c) => {
+                  {visibleCampaigns.map((c) => {
                     const n = prospects.filter(
                       (p) => p.campaignId === c.metaId,
                     ).length

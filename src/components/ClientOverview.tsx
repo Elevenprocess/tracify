@@ -275,16 +275,18 @@ export default function ClientOverview({
             >
               {active.map(renderCard)}
             </CampaignGroup>
-            <CampaignGroup
-              title="Inactives"
-              tone="var(--status-muted)"
-              hint="En pause ou terminées — leurs créatives et résultats restent consultables."
-              count={inactive.length}
-              empty="Aucune campagne inactive."
-              className="mt-5"
-            >
-              {inactive.map(renderCard)}
-            </CampaignGroup>
+            {inactive.length > 0 && (
+              <CampaignGroup
+                title="Inactives"
+                tone="var(--status-muted)"
+                hint="En pause ou terminées — leurs créatives et résultats restent consultables."
+                count={inactive.length}
+                empty="Aucune campagne inactive."
+                className="mt-5"
+              >
+                {inactive.map(renderCard)}
+              </CampaignGroup>
+            )}
           </>
         ) : (
           <div className="island-shell rounded-2xl">
