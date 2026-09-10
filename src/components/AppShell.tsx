@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { SideLink, Sidebar } from './Sidebar'
 import type { FormEvent, ReactNode } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useAction, useQuery } from 'convex/react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { api } from '../../convex/_generated/api'
@@ -9,9 +10,7 @@ import {
   FolderIcon,
   GridIcon,
   LogOutIcon,
-  MenuIcon,
   PlusIcon,
-  XIcon,
 } from './icons'
 
 type Kind = 'client' | 'project'
@@ -33,9 +32,9 @@ export default function AppShell({
 }) {
   return (
     <div className="flex flex-1 flex-col lg:flex-row">
-      <Sidebar initial={sidebarInitial} />
+      <AdminSidebar initial={sidebarInitial} />
       <div className="min-w-0 flex-1">
-        <div className="mx-auto w-full max-w-5xl px-4 py-7 sm:px-8 lg:py-9">
+        <div className="mx-auto w-full max-w-5xl px-4 pb-7 pt-16 sm:px-8 lg:py-9">
           {children}
         </div>
       </div>
@@ -43,75 +42,43 @@ export default function AppShell({
   )
 }
 
-function Sidebar({ initial }: { initial?: Array<SidebarEntry> }) {
+function AdminSidebar({ initial }: { initial?: Array<SidebarEntry> }) {
   const live = useQuery(api.clients.list)
   const entries = live ?? initial
   const projects = (entries ?? []).filter((e) => e.kind === 'project')
   const clients = (entries ?? []).filter((e) => e.kind !== 'project')
 
-  // Sur mobile la barre latérale est repliée derrière un bouton « Menu »
-  // (sinon la liste des clients repousse tout le contenu hors de l'écran).
-  const [open, setOpen] = useState(false)
-
   return (
-    <>
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-4 py-2.5 lg:hidden">
-        <span className="island-kicker m-0 truncate">Tracify · admin</span>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="btn btn-secondary btn-sm"
-        >
-          {open ? (
-            <XIcon className="h-3.5 w-3.5" />
-          ) : (
-            <MenuIcon className="h-3.5 w-3.5" />
-          )}
-          {open ? 'Fermer' : 'Menu'}
-        </button>
+    <Sidebar label="Tracify" ariaLabel="Navigation principale">
+      <div>
+        <SideLink to="/dashboard">
+          <GridIcon className="h-4 w-4 flex-shrink-0" />
+          Vue d'ensemble
+        </SideLink>
       </div>
-      <aside
-        className={`${open ? 'block' : 'hidden'} lg:block w-full flex-shrink-0 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-5 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6`}
-      >
-        <nav
-          aria-label="Navigation principale"
-          className="flex h-full flex-col gap-6"
-          onClick={(e) => {
-            if ((e.target as HTMLElement).closest('a')) setOpen(false)
-          }}
-        >
-          <div>
-            <SideLink to="/dashboard">
-              <GridIcon className="h-4 w-4 flex-shrink-0" />
-              Vue d'ensemble
-            </SideLink>
-          </div>
 
-          <SidebarGroup
-            title="Mes projets"
-            kind="project"
-            icon={<FolderIcon className="h-4 w-4 flex-shrink-0" />}
-            items={projects}
-            loaded={entries !== undefined}
-            emptyLabel="Aucun projet."
-            addLabel="Nouveau projet"
-          />
+      <SidebarGroup
+        title="Mes projets"
+        kind="project"
+        icon={<FolderIcon className="h-4 w-4 flex-shrink-0" />}
+        items={projects}
+        loaded={entries !== undefined}
+        emptyLabel="Aucun projet."
+        addLabel="Nouveau projet"
+      />
 
-          <SidebarGroup
-            title="Clients"
-            kind="client"
-            icon={<BriefcaseIcon className="h-4 w-4 flex-shrink-0" />}
-            items={clients}
-            loaded={entries !== undefined}
-            emptyLabel="Aucun client."
-            addLabel="Nouveau client"
-          />
+      <SidebarGroup
+        title="Clients"
+        kind="client"
+        icon={<BriefcaseIcon className="h-4 w-4 flex-shrink-0" />}
+        items={clients}
+        loaded={entries !== undefined}
+        emptyLabel="Aucun client."
+        addLabel="Nouveau client"
+      />
 
-          <LogoutButton />
-        </nav>
-      </aside>
-    </>
+      <LogoutButton />
+    </Sidebar>
   )
 }
 
@@ -126,35 +93,11 @@ function LogoutButton() {
         navigate({ to: '/login' })
       }}
       className="btn btn-ghost mt-auto w-full justify-start"
+      title="Se déconnecter"
     >
-      <LogOutIcon className="h-4 w-4" />
-      Se déconnecter
+      <LogOutIcon className="h-4 w-4 flex-shrink-0" />
+      <span className="side-label">Se déconnecter</span>
     </button>
-  )
-}
-
-function SideLink({
-  to,
-  params,
-  children,
-}: {
-  to: string
-  params?: Record<string, string>
-  children: ReactNode
-}) {
-  const base =
-    'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold no-underline transition-colors'
-  return (
-    <Link
-      to={to}
-      params={params}
-      className={`${base} text-[var(--sea-ink-soft)] hover:bg-[var(--surface-strong)] hover:text-[var(--sea-ink)]`}
-      activeProps={{
-        className: `${base} bg-[var(--lagoon-tint)] text-[var(--sea-ink)] before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-[var(--lagoon)]`,
-      }}
-    >
-      {children}
-    </Link>
   )
 }
 
@@ -207,7 +150,7 @@ function SidebarGroup({
 
   return (
     <div>
-      <p className="island-kicker m-0 mb-2 flex items-center justify-between px-3">
+      <p className="side-label island-kicker m-0 mb-2 flex items-center justify-between px-3">
         {title}
         {loaded && items.length > 0 && (
           <span className="tabular font-semibold text-[var(--sea-ink-faint)]">
@@ -245,12 +188,12 @@ function SidebarGroup({
         ))}
         {!loaded &&
           [0, 1].map((i) => (
-            <li key={i} className="px-3 py-1.5">
+            <li key={i} className="side-label px-3 py-1.5">
               <span className="skeleton block h-4 w-32" />
             </li>
           ))}
         {loaded && items.length === 0 && (
-          <li className="px-3 py-1.5 text-sm text-[var(--sea-ink-faint)]">
+          <li className="side-label px-3 py-1.5 text-sm text-[var(--sea-ink-faint)]">
             {emptyLabel}
           </li>
         )}
@@ -259,7 +202,7 @@ function SidebarGroup({
       {showForm ? (
         <form
           onSubmit={onSubmit}
-          className="mt-2 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3"
+          className="side-label mt-2 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3"
         >
           <label className="text-xs font-semibold text-[var(--sea-ink-soft)]">
             Nom
@@ -312,9 +255,10 @@ function SidebarGroup({
           type="button"
           onClick={() => setShowForm(true)}
           className="btn btn-dashed btn-sm mt-2 w-full justify-start"
+          title={addLabel}
         >
-          <PlusIcon className="h-3.5 w-3.5" />
-          {addLabel}
+          <PlusIcon className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="side-label">{addLabel}</span>
         </button>
       )}
     </div>

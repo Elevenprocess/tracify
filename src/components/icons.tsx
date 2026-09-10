@@ -128,6 +128,14 @@ export function LogOutIcon({ className = 'h-4 w-4' }: IconProps) {
   )
 }
 
+export function ChevronLeftIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  )
+}
+
 export function ChevronRightIcon({ className = 'h-4 w-4' }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

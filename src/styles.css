@@ -452,3 +452,11 @@ a {
     animation: none;
   }
 }
+
+/* Barre latérale repliée (ordinateur) : les libellés, titres de groupes,
+   compteurs et formulaires disparaissent, seules les icônes restent. */
+@media (min-width: 1024px) {
+  .side-nav.is-collapsed .side-label {
+    display: none !important;
+  }
+}

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useConvexAuth, useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
+import { SideButton, Sidebar } from '../components/Sidebar'
 import CampaignOverview, {
   isActiveStatus,
   statusLabel,
@@ -16,9 +16,7 @@ import {
   GridIcon,
   LogOutIcon,
   MegaphoneIcon,
-  MenuIcon,
   UsersIcon,
-  XIcon,
 } from '../components/icons'
 import ClientOverview from '../components/ClientOverview'
 import { DocumentList } from '../components/ClientDocuments'
@@ -200,8 +198,6 @@ function SuiviView({
   invalidAction?: string
 }) {
   const [section, setSection] = useState<Section>({ kind: 'overview' })
-  // Mobile : barre latérale repliée derrière un bouton « Menu »
-  const [menuOpen, setMenuOpen] = useState(false)
   const quit = onQuit
 
   if (data === undefined) {
@@ -245,7 +241,6 @@ function SuiviView({
   const sideCampaigns = visibleCampaigns
   const go = (next: Section) => {
     setSection(next)
-    setMenuOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -285,127 +280,106 @@ function SuiviView({
 
   return (
     <div className="flex flex-1 flex-col lg:flex-row">
-      {/* Mobile : en-tête compact + bouton Menu */}
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-4 py-2.5 lg:hidden">
-        <span className="island-kicker m-0 truncate">{data.client.name}</span>
-        <button
-          type="button"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-expanded={menuOpen}
-          className="btn btn-secondary btn-sm"
-        >
-          {menuOpen ? (
-            <XIcon className="h-3.5 w-3.5" />
-          ) : (
-            <MenuIcon className="h-3.5 w-3.5" />
-          )}
-          {menuOpen ? 'Fermer' : 'Menu'}
-        </button>
-      </div>
-      {/* Barre latérale */}
-      <aside
-        className={`${menuOpen ? 'block' : 'hidden'} lg:block w-full flex-shrink-0 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-5 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6`}
-      >
-        <nav aria-label="Navigation" className="flex h-full flex-col gap-6">
-          <div>
-            <p className="island-kicker m-0 mb-2 px-3 truncate">
-              {data.client.name}
-            </p>
-            <SideButton
-              active={section.kind === 'overview'}
-              onClick={() => go({ kind: 'overview' })}
-            >
-              <GridIcon className="h-4 w-4 flex-shrink-0" />
-              Vue d'ensemble
-            </SideButton>
-          </div>
+      <Sidebar label={data.client.name}>
+        <div>
+          <SideButton
+            active={section.kind === 'overview'}
+            onClick={() => go({ kind: 'overview' })}
+          >
+            <GridIcon className="h-4 w-4 flex-shrink-0" />
+            Vue d'ensemble
+          </SideButton>
+        </div>
 
-          <div>
-            <p className="island-kicker m-0 mb-2 flex items-center justify-between px-3">
-              Campagnes
-              <span className="tabular text-[var(--sea-ink-faint)]">
-                {visibleCampaigns.length}
-              </span>
-            </p>
-            <div className="flex flex-col gap-0.5">
-              {sideCampaigns.map((c) => {
-                const st = statusLabel(c.status)
-                return (
-                  <SideButton
-                    key={c.metaId}
-                    active={
-                      section.kind === 'campaign' && section.metaId === c.metaId
-                    }
-                    onClick={() => go({ kind: 'campaign', metaId: c.metaId })}
-                  >
-                    <MegaphoneIcon className="h-4 w-4 flex-shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                    {st && (
-                      <span
-                        className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                        style={{ background: st.color }}
-                        aria-hidden="true"
-                        title={st.label}
-                      />
-                    )}
-                  </SideButton>
-                )
-              })}
-              {visibleCampaigns.length === 0 && (
-                <p className="m-0 px-3 py-1 text-xs text-[var(--sea-ink-faint)]">
-                  Aucune campagne pour l'instant.
-                </p>
-              )}
-            </div>
-          </div>
-
+        <div>
+          <p className="side-label island-kicker m-0 mb-2 flex items-center justify-between px-3">
+            Campagnes
+            <span className="tabular text-[var(--sea-ink-faint)]">
+              {visibleCampaigns.length}
+            </span>
+          </p>
           <div className="flex flex-col gap-0.5">
-            <SideButton
-              active={section.kind === 'prospects'}
-              onClick={() => go({ kind: 'prospects' })}
-            >
-              <UsersIcon className="h-4 w-4 flex-shrink-0" />
-              <span className="flex-1">Prospects</span>
-              {fresh > 0 ? (
-                <span className="tabular rounded-md bg-[var(--lagoon)] px-1.5 py-0.5 text-[10px] font-extrabold text-[var(--lagoon-ink)]">
-                  {fresh}
-                </span>
-              ) : (
-                <span className="tabular text-xs text-[var(--sea-ink-faint)]">
-                  {prospects.length}
-                </span>
-              )}
-            </SideButton>
-            <SideButton
-              active={section.kind === 'documents'}
-              onClick={() => go({ kind: 'documents' })}
-            >
-              <FolderIcon className="h-4 w-4 flex-shrink-0" />
-              <span className="flex-1">Dossier</span>
-              {documents && documents.length > 0 && (
-                <span className="tabular text-xs text-[var(--sea-ink-faint)]">
-                  {documents.length}
-                </span>
-              )}
-            </SideButton>
+            {sideCampaigns.map((c) => {
+              const st = statusLabel(c.status)
+              return (
+                <SideButton
+                  key={c.metaId}
+                  active={
+                    section.kind === 'campaign' && section.metaId === c.metaId
+                  }
+                  onClick={() => go({ kind: 'campaign', metaId: c.metaId })}
+                  title={c.name}
+                >
+                  <MegaphoneIcon className="h-4 w-4 flex-shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  {st && (
+                    <span
+                      className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                      style={{ background: st.color }}
+                      aria-hidden="true"
+                      title={st.label}
+                    />
+                  )}
+                </SideButton>
+              )
+            })}
+            {visibleCampaigns.length === 0 && (
+              <p className="side-label m-0 px-3 py-1 text-xs text-[var(--sea-ink-faint)]">
+                Aucune campagne pour l'instant.
+              </p>
+            )}
           </div>
+        </div>
 
-          <div className="mt-auto">
-            <button
-              type="button"
-              onClick={quit}
-              className="btn btn-secondary btn-sm w-full justify-center"
-            >
-              <LogOutIcon className="h-3.5 w-3.5" />
-              {quitLabel}
-            </button>
-          </div>
-        </nav>
-      </aside>
+        <div className="flex flex-col gap-0.5">
+          <SideButton
+            active={section.kind === 'prospects'}
+            onClick={() => go({ kind: 'prospects' })}
+            title="Prospects"
+          >
+            <UsersIcon className="h-4 w-4 flex-shrink-0" />
+            <span className="flex-1">Prospects</span>
+            {fresh > 0 ? (
+              <span className="tabular rounded-md bg-[var(--lagoon)] px-1.5 py-0.5 text-[10px] font-extrabold text-[var(--lagoon-ink)]">
+                {fresh}
+              </span>
+            ) : (
+              <span className="tabular text-xs text-[var(--sea-ink-faint)]">
+                {prospects.length}
+              </span>
+            )}
+          </SideButton>
+          <SideButton
+            active={section.kind === 'documents'}
+            onClick={() => go({ kind: 'documents' })}
+            title="Dossier"
+          >
+            <FolderIcon className="h-4 w-4 flex-shrink-0" />
+            <span className="flex-1">Dossier</span>
+            {documents && documents.length > 0 && (
+              <span className="tabular text-xs text-[var(--sea-ink-faint)]">
+                {documents.length}
+              </span>
+            )}
+          </SideButton>
+        </div>
+
+        <div className="mt-auto">
+          <button
+            type="button"
+            onClick={quit}
+            className="btn btn-secondary btn-sm w-full justify-center"
+            title={quitLabel}
+          >
+            <LogOutIcon className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="side-label">{quitLabel}</span>
+          </button>
+        </div>
+      </Sidebar>
 
       {/* Contenu */}
       <div className="min-w-0 flex-1">
-        <main className="mx-auto w-full min-w-0 max-w-5xl px-4 py-7 sm:px-8 lg:py-9">
+        <main className="mx-auto w-full min-w-0 max-w-5xl px-4 pb-7 pt-16 sm:px-8 lg:py-9">
           <header className="rise-in mb-6">
             <p className="island-kicker m-0 mb-1.5">
               Suivi de vos publicités · {data.client.name}
@@ -603,32 +577,5 @@ function SuiviView({
         </main>
       </div>
     </div>
-  )
-}
-
-function SideButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  const base =
-    'relative flex w-full cursor-pointer items-center gap-2.5 rounded-lg border-0 px-3 py-2 text-left text-sm font-semibold transition-colors'
-  return (
-    <button
-      type="button"
-      aria-current={active ? 'page' : undefined}
-      onClick={onClick}
-      className={
-        active
-          ? `${base} bg-[var(--lagoon-tint)] text-[var(--sea-ink)] before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-[var(--lagoon)]`
-          : `${base} bg-transparent text-[var(--sea-ink-soft)] hover:bg-[var(--surface-strong)] hover:text-[var(--sea-ink)]`
-      }
-    >
-      {children}
-    </button>
   )
 }
