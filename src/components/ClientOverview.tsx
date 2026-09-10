@@ -184,7 +184,7 @@ export default function ClientOverview({
       </section>
 
       {daily.length > 1 && (
-        <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <article className="island-shell rise-in rounded-2xl p-5">
             <h2 className="demo-section-title mb-4">Dépense quotidienne</h2>
             <LineChart data={spendSeries} formatValue={formatEuro} />
@@ -346,7 +346,7 @@ function CampaignGroup({
           {empty}
         </p>
       ) : (
-        <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2">
+        <ul className="m-0 grid grid-cols-1 list-none gap-3 p-0 md:grid-cols-2">
           {children}
         </ul>
       )}

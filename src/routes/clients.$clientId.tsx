@@ -178,7 +178,7 @@ function ClientDetail() {
 
           <section
             aria-label="Indicateurs clés"
-            className="rise-in grid gap-4 sm:grid-cols-3"
+            className="rise-in grid grid-cols-1 gap-4 sm:grid-cols-3"
           >
             <KpiCard
               label="Dépense publicitaire"
@@ -197,7 +197,7 @@ function ClientDetail() {
             />
           </section>
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-[3fr_2fr]">
+          <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
             <article className="island-shell rise-in rounded-2xl p-5">
               <h2 className="demo-section-title mb-4">Prospects par semaine</h2>
               {weekly.length > 0 ? (

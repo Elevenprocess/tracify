@@ -180,7 +180,10 @@ export function PipelineBoard({
         </span>
       </SectionTitle>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Pipeline : les 4 colonnes côte à côte, défilement horizontal
+          (gauche → droite) tant que l'écran est trop étroit ; grille pleine
+          largeur à partir de xl. */}
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:-mx-0 sm:px-0 xl:grid xl:grid-cols-4 xl:overflow-visible xl:pb-0">
         {COLUMNS.map((col) => {
           const cards = shown.filter((p) => p.status === col.status)
           return (
@@ -192,7 +195,7 @@ export function PipelineBoard({
               }}
               onDragLeave={() => setDragOver(null)}
               onDrop={(e) => onDrop(e, col.status)}
-              className={`flex min-h-44 flex-col rounded-2xl border p-2.5 transition-colors ${
+              className={`flex min-h-44 w-[17rem] flex-shrink-0 snap-start flex-col rounded-2xl border p-2.5 transition-colors xl:w-auto ${
                 dragOver === col.status
                   ? 'border-[var(--lagoon)] bg-[var(--lagoon-tint)]'
                   : 'border-[var(--line)] bg-[var(--surface)]'

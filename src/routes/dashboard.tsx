@@ -67,7 +67,7 @@ function Dashboard() {
 
       <section
         aria-label="Indicateurs clés"
-        className="rise-in grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="rise-in grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <KpiCard
           label="Dépense publicitaire"
@@ -182,7 +182,7 @@ function Dashboard() {
       )}
 
       {data.daily.length > 1 && (
-        <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <article className="island-shell rise-in rounded-2xl p-5">
             <h2 className="demo-section-title mb-4">Dépense quotidienne</h2>
             <LineChart data={spendSeries} formatValue={formatEuro} />

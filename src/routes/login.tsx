@@ -73,7 +73,7 @@ function LoginPage() {
         </div>
       )}
 
-      <div className="rise-in grid w-full max-w-3xl gap-4 md:grid-cols-2">
+      <div className="rise-in grid grid-cols-1 w-full max-w-3xl gap-4 md:grid-cols-2">
         <section className="island-shell flex flex-col rounded-2xl p-6 sm:p-7">
           <span className="icon-chip mb-4">
             <KeyIcon className="h-4 w-4" />

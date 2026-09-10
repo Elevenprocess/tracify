@@ -254,7 +254,7 @@ export default function ClientDocuments({
                     color={kind.color}
                     alt={item.name}
                   />
-                  <div className="grid min-w-0 flex-1 basis-64 gap-1.5 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 min-w-0 flex-1 basis-64 gap-1.5 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-[var(--sea-ink-faint)]">
                         Nom
@@ -497,7 +497,7 @@ function DocumentRow({
               e.preventDefault()
               save()
             }}
-            className="grid gap-1.5 sm:grid-cols-[1fr_1fr_auto]"
+            className="grid grid-cols-1 gap-1.5 sm:grid-cols-[1fr_1fr_auto]"
           >
             <input
               value={name}

@@ -73,7 +73,7 @@ export default function CampaignOverview({
     <>
       <section
         aria-label="Indicateurs clés"
-        className={`rise-in grid gap-4 ${compact ? 'grid-cols-2 gap-3 sm:grid-cols-3' : 'sm:grid-cols-3'}`}
+        className={`rise-in grid gap-4 ${compact ? 'grid-cols-2 gap-3 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}
       >
         <KpiCard
           label="Dépense publicitaire"
@@ -114,7 +114,7 @@ export default function CampaignOverview({
       </section>
 
       {data.daily.length > 1 && (
-        <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <article className="island-shell rise-in rounded-2xl p-5">
             <h2 className="demo-section-title mb-4">Dépense quotidienne</h2>
             <LineChart data={spendSeries} formatValue={formatEuro} />

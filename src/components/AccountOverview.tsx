@@ -57,7 +57,7 @@ export default function AccountOverview({
       <SectionTitle icon={<GridIcon className="h-4 w-4" />}>
         Tableau de bord du compte
       </SectionTitle>
-      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
         {/* Pipeline */}
         <article className="island-shell rise-in rounded-2xl p-5">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-2">

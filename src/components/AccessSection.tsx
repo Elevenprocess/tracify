@@ -52,7 +52,7 @@ export default function AccessSection({ clientSlug }: { clientSlug: string }) {
       <SectionTitle icon={<KeyIcon className="h-4 w-4" />}>
         Accès client
       </SectionTitle>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <article className="island-shell rise-in flex flex-col rounded-2xl p-5">
           <h3 className="m-0 text-sm font-bold text-[var(--sea-ink)]">
             Code de suivi

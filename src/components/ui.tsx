@@ -130,7 +130,7 @@ export function PageSkeleton({ kpis = 3 }: { kpis?: number }) {
         <Skeleton className="h-8 w-72 max-w-full" />
       </div>
       <div
-        className="grid gap-4"
+        className="grid grid-cols-1 gap-4"
         style={{
           gridTemplateColumns: `repeat(auto-fit, minmax(${kpis > 3 ? '180px' : '220px'}, 1fr))`,
         }}
@@ -142,7 +142,7 @@ export function PageSkeleton({ kpis = 3 }: { kpis?: number }) {
           </div>
         ))}
       </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="island-shell rounded-2xl p-5">
           <Skeleton className="mb-4 h-4 w-40" />
           <Skeleton className="h-44 w-full" />

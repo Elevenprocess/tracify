@@ -16,13 +16,19 @@ import {
   GridIcon,
   LogOutIcon,
   MegaphoneIcon,
+  MenuIcon,
   UsersIcon,
+  XIcon,
 } from '../components/icons'
 import ClientOverview from '../components/ClientOverview'
 import { DocumentList } from '../components/ClientDocuments'
 import type { DocumentItem } from '../components/ClientDocuments'
 import { isRecent } from '../lib/format'
 import { ACCESS_CODE_KEY } from '../lib/accessCode'
+
+// Au-delà de ce nombre de campagnes, le filtre des prospects est une liste
+// déroulante (une rangée de boutons ferait un mur de puces).
+const MAX_FILTER_CHIPS = 8
 
 export const Route = createFileRoute('/suivi')({
   // ?apercu=<slug> : aperçu admin « voir comme le client » (session requise)
@@ -194,6 +200,8 @@ function SuiviView({
   invalidAction?: string
 }) {
   const [section, setSection] = useState<Section>({ kind: 'overview' })
+  // Mobile : barre latérale repliée derrière un bouton « Menu »
+  const [menuOpen, setMenuOpen] = useState(false)
   const quit = onQuit
 
   if (data === undefined) {
@@ -234,6 +242,7 @@ function SuiviView({
   )
   const go = (next: Section) => {
     setSection(next)
+    setMenuOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -273,8 +282,27 @@ function SuiviView({
 
   return (
     <div className="flex flex-1 flex-col lg:flex-row">
+      {/* Mobile : en-tête compact + bouton Menu */}
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-4 py-2.5 lg:hidden">
+        <span className="island-kicker m-0 truncate">{data.client.name}</span>
+        <button
+          type="button"
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-expanded={menuOpen}
+          className="btn btn-secondary btn-sm"
+        >
+          {menuOpen ? (
+            <XIcon className="h-3.5 w-3.5" />
+          ) : (
+            <MenuIcon className="h-3.5 w-3.5" />
+          )}
+          {menuOpen ? 'Fermer' : 'Menu'}
+        </button>
+      </div>
       {/* Barre latérale */}
-      <aside className="w-full flex-shrink-0 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-5 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6">
+      <aside
+        className={`${menuOpen ? 'block' : 'hidden'} lg:block w-full flex-shrink-0 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-5 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6`}
+      >
         <nav aria-label="Navigation" className="flex h-full flex-col gap-6">
           <div>
             <p className="island-kicker m-0 mb-2 px-3 truncate">
@@ -490,8 +518,51 @@ function SuiviView({
 
           {section.kind === 'prospects' && (
             <>
+              {/* Mobile : liste déroulante (la rangée de boutons prendrait
+                  tout l'écran avec des dizaines de campagnes) */}
               {data.campaigns.length > 0 && (
-                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                <label
+                  className={`mb-3 flex items-center gap-2 text-xs font-semibold text-[var(--sea-ink-soft)] ${
+                    data.campaigns.length > MAX_FILTER_CHIPS ? '' : 'sm:hidden'
+                  }`}
+                >
+                  Filtrer :
+                  <select
+                    value={filterId ?? ''}
+                    onChange={(e) =>
+                      setSection(
+                        e.target.value
+                          ? { kind: 'prospects', campaignId: e.target.value }
+                          : { kind: 'prospects' },
+                      )
+                    }
+                    className="field min-w-0 flex-1 py-1.5 text-xs"
+                    aria-label="Filtrer par campagne"
+                  >
+                    <option value="">
+                      Toutes les campagnes ({prospects.length})
+                    </option>
+                    {data.campaigns.map((c) => (
+                      <option key={c.metaId} value={c.metaId}>
+                        {c.name} (
+                        {
+                          prospects.filter((p) => p.campaignId === c.metaId)
+                            .length
+                        }
+                        )
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {data.campaigns.length > 0 && (
+                <div
+                  className={`mb-1 flex-wrap items-center gap-1.5 ${
+                    data.campaigns.length > MAX_FILTER_CHIPS
+                      ? 'hidden'
+                      : 'hidden sm:flex'
+                  }`}
+                >
                   <span className="mr-1 text-xs font-semibold text-[var(--sea-ink-soft)]">
                     Filtrer :
                   </span>

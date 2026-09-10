@@ -9,7 +9,9 @@ import {
   FolderIcon,
   GridIcon,
   LogOutIcon,
+  MenuIcon,
   PlusIcon,
+  XIcon,
 } from './icons'
 
 type Kind = 'client' | 'project'
@@ -47,42 +49,69 @@ function Sidebar({ initial }: { initial?: Array<SidebarEntry> }) {
   const projects = (entries ?? []).filter((e) => e.kind === 'project')
   const clients = (entries ?? []).filter((e) => e.kind !== 'project')
 
+  // Sur mobile la barre latérale est repliée derrière un bouton « Menu »
+  // (sinon la liste des clients repousse tout le contenu hors de l'écran).
+  const [open, setOpen] = useState(false)
+
   return (
-    <aside className="w-full flex-shrink-0 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-5 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6">
-      <nav
-        aria-label="Navigation principale"
-        className="flex h-full flex-col gap-6"
+    <>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-4 py-2.5 lg:hidden">
+        <span className="island-kicker m-0 truncate">Tracify · admin</span>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="btn btn-secondary btn-sm"
+        >
+          {open ? (
+            <XIcon className="h-3.5 w-3.5" />
+          ) : (
+            <MenuIcon className="h-3.5 w-3.5" />
+          )}
+          {open ? 'Fermer' : 'Menu'}
+        </button>
+      </div>
+      <aside
+        className={`${open ? 'block' : 'hidden'} lg:block w-full flex-shrink-0 border-b border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-5 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:w-64 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6`}
       >
-        <div>
-          <SideLink to="/dashboard">
-            <GridIcon className="h-4 w-4 flex-shrink-0" />
-            Vue d'ensemble
-          </SideLink>
-        </div>
+        <nav
+          aria-label="Navigation principale"
+          className="flex h-full flex-col gap-6"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('a')) setOpen(false)
+          }}
+        >
+          <div>
+            <SideLink to="/dashboard">
+              <GridIcon className="h-4 w-4 flex-shrink-0" />
+              Vue d'ensemble
+            </SideLink>
+          </div>
 
-        <SidebarGroup
-          title="Mes projets"
-          kind="project"
-          icon={<FolderIcon className="h-4 w-4 flex-shrink-0" />}
-          items={projects}
-          loaded={entries !== undefined}
-          emptyLabel="Aucun projet."
-          addLabel="Nouveau projet"
-        />
+          <SidebarGroup
+            title="Mes projets"
+            kind="project"
+            icon={<FolderIcon className="h-4 w-4 flex-shrink-0" />}
+            items={projects}
+            loaded={entries !== undefined}
+            emptyLabel="Aucun projet."
+            addLabel="Nouveau projet"
+          />
 
-        <SidebarGroup
-          title="Clients"
-          kind="client"
-          icon={<BriefcaseIcon className="h-4 w-4 flex-shrink-0" />}
-          items={clients}
-          loaded={entries !== undefined}
-          emptyLabel="Aucun client."
-          addLabel="Nouveau client"
-        />
+          <SidebarGroup
+            title="Clients"
+            kind="client"
+            icon={<BriefcaseIcon className="h-4 w-4 flex-shrink-0" />}
+            items={clients}
+            loaded={entries !== undefined}
+            emptyLabel="Aucun client."
+            addLabel="Nouveau client"
+          />
 
-        <LogoutButton />
-      </nav>
-    </aside>
+          <LogoutButton />
+        </nav>
+      </aside>
+    </>
   )
 }
 

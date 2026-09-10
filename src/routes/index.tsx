@@ -114,7 +114,7 @@ function Landing() {
           <h2 className="m-0 mb-8 max-w-xl text-[clamp(1.375rem,2vw+0.75rem,1.875rem)] font-bold tracking-tight sm:mb-10">
             Le pilotage publicitaire, sans les allers-retours
           </h2>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {FEATURES.map((f) => (
               <article
                 key={f.title}
