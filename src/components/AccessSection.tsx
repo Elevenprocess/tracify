@@ -268,6 +268,91 @@ export function GhlCard({ metaId }: { metaId: string }) {
   )
 }
 
+// Journal des dernières réceptions du webhook : heure, résultat, campagne
+// visée — pour voir depuis Tracify ce que GHL a réellement envoyé.
+type WebhookEvent = {
+  id: string
+  at: string
+  outcome: string
+  detail: string | null
+  name: string | null
+  campaignParam: string | null
+  bodyCampaign: string | null
+  campaignId: string | null
+  campaignName: string | null
+  hasAttribution: boolean
+  test: boolean
+}
+
+const OUTCOME_UI: Record<string, { label: string; tone: 'good' | 'warn' | 'bad' }> = {
+  imported: { label: 'Prospect ajouté', tone: 'good' },
+  test: { label: 'Test GHL → carte ajoutée', tone: 'good' },
+  duplicate: { label: 'Déjà connu, ignoré', tone: 'warn' },
+  'no-campaign': { label: 'Sans campagne, ignoré', tone: 'bad' },
+  'test-no-campaign': {
+    label: "Test GHL sans campagne dans l'adresse",
+    tone: 'bad',
+  },
+  'other-client': { label: "Campagne d'un autre client", tone: 'bad' },
+  'bad-key': { label: 'Clé invalide', tone: 'bad' },
+}
+
+function WebhookJournal({
+  events,
+  campaignId,
+}: {
+  events: Array<WebhookEvent> | undefined
+  campaignId?: string
+}) {
+  if (!events || events.length === 0) return null
+  return (
+    <div>
+      <span className="island-kicker">Dernières réceptions</span>
+      <ul className="m-0 mt-1 list-none space-y-1 p-0">
+        {events.map((e) => {
+          const ui = OUTCOME_UI[e.outcome] ?? { label: e.outcome, tone: 'warn' }
+          const color =
+            ui.tone === 'good'
+              ? 'text-[var(--status-good)]'
+              : ui.tone === 'warn'
+                ? 'text-[var(--status-warn)]'
+                : 'text-[var(--status-bad)]'
+          const here = campaignId && e.campaignId === campaignId
+          return (
+            <li
+              key={e.id}
+              className="rounded-lg border border-[var(--line)] bg-[var(--surface-solid)] px-2.5 py-1.5 text-[11px] leading-relaxed text-[var(--sea-ink-soft)]"
+            >
+              <span className="tabular text-[var(--sea-ink)]">
+                {new Date(e.at).toLocaleString('fr-FR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+              {' · '}
+              <strong className={color}>{ui.label}</strong>
+              {e.name ? ` · ${e.name}` : ''}
+              {e.campaignName ? (
+                <>
+                  {' · '}
+                  {here ? 'cette campagne' : e.campaignName}
+                </>
+              ) : (
+                ' · aucune campagne dans l’adresse ni dans le corps'
+              )}
+              {e.outcome === 'test-no-campaign' || e.outcome === 'no-campaign'
+                ? " → colle l’adresse « GHL » de la page campagne (elle contient &campaign=…)"
+                : ''}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 // Clé du webhook d'entrée des leads : à coller dans l'action « Webhook »
 // d'un workflow GoHighLevel (ou n8n / Zapier). Chaque lead est rangé dans la
 // campagne Meta de son attribution, créée dans Tracify si elle est nouvelle.
@@ -284,6 +369,7 @@ export function WebhookCard({
   ghlGuide?: boolean
 }) {
   const status = useQuery(api.leads.webhookStatus, { clientSlug })
+  const events = useQuery(api.leads.webhookEvents, { clientSlug, limit: 8 })
   const key = status === undefined ? undefined : (status?.key ?? null)
   const generate = useMutation(api.leads.generateWebhookKey)
   const revoke = useMutation(api.leads.revokeWebhookKey)
@@ -617,6 +703,7 @@ export function WebhookCard({
               </p>
             </div>
           )}
+          <WebhookJournal events={events} campaignId={campaignId} />
           <div className="flex flex-wrap gap-2">
             <button
               type="button"

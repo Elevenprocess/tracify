@@ -90,6 +90,48 @@ export const webhookStatus = query({
   },
 })
 
+// Journal des dernières réceptions du webhook (fiche client et page
+// campagne) : ce que GHL a envoyé et ce que Tracify en a fait.
+export const webhookEvents = query({
+  args: { clientSlug: v.string(), limit: v.optional(v.number()) },
+  handler: async (ctx, { clientSlug, limit }) => {
+    await requireUser(ctx)
+    const rows = await ctx.db
+      .query('webhookEvents')
+      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+      .order('desc')
+      .take(limit ?? 10)
+    const names = new Map<string, string>()
+    for (const r of rows) {
+      const id = r.campaignId ?? r.campaignParam
+      if (id && !names.has(id)) {
+        const c = await ctx.db
+          .query('campaigns')
+          .withIndex('by_meta', (q) => q.eq('metaId', id))
+          .unique()
+        names.set(id, c?.name ?? id)
+      }
+    }
+    return rows.map((r) => ({
+      id: r._id,
+      at: r.at,
+      outcome: r.outcome,
+      detail: r.detail ?? null,
+      name: r.name ?? null,
+      campaignParam: r.campaignParam ?? null,
+      bodyCampaign: r.bodyCampaign ?? null,
+      campaignId: r.campaignId ?? null,
+      campaignName: (() => {
+        const id = r.campaignId ?? r.campaignParam
+        return id ? (names.get(id) ?? id) : null
+      })(),
+      hasAttribution: r.hasAttribution,
+      test: r.test,
+      userAgent: r.userAgent ?? null,
+    }))
+  },
+})
+
 // Génère (ou régénère) la clé : l'ancienne cesse d'être acceptée.
 export const generateWebhookKey = mutation({
   args: { clientSlug: v.string() },
@@ -134,12 +176,19 @@ export const setWebhookKey = internalMutation({
 // --- Réception ---------------------------------------------------------------
 
 type Outcome =
-  'imported' | 'duplicate' | 'no-campaign' | 'other-client' | 'test'
+  | 'imported'
+  | 'duplicate'
+  | 'no-campaign'
+  | 'test-no-campaign'
+  | 'other-client'
+  | 'test'
 
 const OUTCOME_LABEL: Record<Outcome, string> = {
   imported: 'prospect ajouté',
   duplicate: 'déjà connu',
   'no-campaign': 'ignoré : aucune campagne Meta dans son attribution',
+  'test-no-campaign':
+    "test GHL reçu SANS campagne dans l'adresse : colle l'adresse « GHL » de la page de la campagne (…&campaign=…)",
   'other-client': 'ignoré : campagne rattachée à un autre client',
   test: 'test GHL reçu, prospect « Test GHL » ajouté dans la campagne',
 }
@@ -168,7 +217,11 @@ async function recordWebhook(
       duplicates: c.duplicates + (outcome === 'duplicate' ? 1 : 0),
       noCampaign:
         c.noCampaign +
-        (outcome === 'no-campaign' || outcome === 'other-client' ? 1 : 0),
+        (outcome === 'no-campaign' ||
+        outcome === 'test-no-campaign' ||
+        outcome === 'other-client'
+          ? 1
+          : 0),
     },
   })
 }
@@ -191,13 +244,41 @@ export const ingest = internalMutation({
     // faire apparaître une carte), sans dédoublonnage pour que chaque clic
     // ajoute une carte.
     test: v.optional(v.boolean()),
+    // Pour le journal des réceptions
+    campaignParam: v.optional(v.string()),
+    bodyCampaign: v.optional(v.string()),
+    hasAttribution: v.optional(v.boolean()),
+    userAgent: v.optional(v.string()),
   },
   handler: async (ctx, a) => {
     const client = await ctx.db
       .query('clients')
       .withIndex('by_webhook', (q) => q.eq('webhookKey', a.key))
       .unique()
-    if (!client) return { ok: false as const, error: 'Clé invalide.' }
+    const log = async (
+      outcome: Outcome | 'bad-key',
+      detail?: string,
+      campaignId?: string,
+    ) => {
+      await ctx.db.insert('webhookEvents', {
+        clientSlug: client?.slug,
+        at: new Date().toISOString(),
+        outcome,
+        detail,
+        name: a.name.trim() || undefined,
+        campaignParam: a.campaignParam || undefined,
+        bodyCampaign: a.bodyCampaign || undefined,
+        campaignId: campaignId || undefined,
+        hasAttribution: a.hasAttribution ?? false,
+        test: a.test ?? false,
+        keyOk: !!client,
+        userAgent: a.userAgent,
+      })
+    }
+    if (!client) {
+      await log('bad-key', `clé reçue : ${a.key.slice(0, 12)}…`)
+      return { ok: false as const, error: 'Clé invalide.' }
+    }
 
     const name = a.name.trim()
 
@@ -209,6 +290,7 @@ export const ingest = internalMutation({
         .first()
       if (known) {
         await recordWebhook(ctx, client, 'duplicate', name)
+        await log('duplicate', `même contact GHL (${name})`, known.campaignId)
         return { ok: true as const, id: known._id, duplicate: true }
       }
     }
@@ -223,8 +305,13 @@ export const ingest = internalMutation({
     )
     if (routed.kind !== 'campaign') {
       const outcome: Outcome =
-        routed.kind === 'none' ? 'no-campaign' : 'other-client'
+        routed.kind === 'none'
+          ? a.test
+            ? 'test-no-campaign'
+            : 'no-campaign'
+          : 'other-client'
       await recordWebhook(ctx, client, outcome, name)
+      await log(outcome, name, a.campaignId)
       return {
         ok: true as const,
         skipped: outcome,
@@ -247,6 +334,11 @@ export const ingest = internalMutation({
       if (!dup.campaignId) patch.campaignId = campaignId
       if (Object.keys(patch).length) await ctx.db.patch(dup._id, patch)
       await recordWebhook(ctx, client, 'duplicate', name)
+      await log(
+        'duplicate',
+        `même téléphone ou email que « ${dup.name} »`,
+        campaignId,
+      )
       return { ok: true as const, id: dup._id, duplicate: true }
     }
 
@@ -272,6 +364,11 @@ export const ingest = internalMutation({
       client,
       a.test ? 'test' : 'imported',
       routed.created ? `${name} · nouvelle campagne détectée` : name,
+    )
+    await log(
+      a.test ? 'test' : 'imported',
+      routed.created ? `${name} · nouvelle campagne détectée` : name,
+      campaignId,
     )
     return {
       ok: true as const,
@@ -361,11 +458,21 @@ export const receive = httpAction(async (ctx, req) => {
 
   // Campagne explicite (n8n, Zapier…) ou forcée par l'adresse, sinon
   // attribution GHL.
-  let campaignId =
+  // Bouton « Tester » d'un workflow GHL : valeurs factices du type
+  // « <test lead: dummy data for full_name> ».
+  const isGhlTest = /dummy data|<test lead/i.test(
+    [name, phone, email].join(' '),
+  )
+
+  // `campaign` / `campaign_id` dans le corps = solution de repli si GHL
+  // n'envoie pas les paramètres de l'adresse (champ « Custom data »).
+  const bodyCampaign = (
     str(body.campaignId) ||
     str(body.campaign_id) ||
-    forcedCampaign ||
-    attributedCampaign(attr).id
+    str(body.campaign)
+  ).replace(/\D/g, '')
+  let campaignId =
+    bodyCampaign || forcedCampaign || attributedCampaign(attr).id
   let campaignName =
     str(body.campaignName) ||
     str(body.campaign_name) ||
@@ -373,7 +480,7 @@ export const receive = httpAction(async (ctx, req) => {
 
   // Payload GHL sans attribution : on relit la fiche contact par l'API
   // (le workflow n'embarque pas toujours attributionSource).
-  if (!campaignId && ghlContactId) {
+  if (!campaignId && ghlContactId && !isGhlTest) {
     const locationId =
       str(obj(body.location).id) ||
       str(body.locationId) ||
@@ -405,12 +512,6 @@ export const receive = httpAction(async (ctx, req) => {
   const ghl = describeAttribution(attr, tags, str(body.contact_source))
   const hasAttr = Object.keys(attr).length > 0 || tags.length > 0
 
-  // Bouton « Tester » d'un workflow GHL : valeurs factices du type
-  // « <test lead: dummy data for full_name> ».
-  const isGhlTest = /dummy data|<test lead/i.test(
-    [name, phone, email].join(' '),
-  )
-
   // Données factices de GHL (« <test lead: dummy data for phone> »…) :
   // remplacées par un nom lisible et daté, sans téléphone ni email.
   const testName = `Test GHL ${new Date().toLocaleString('fr-FR', {
@@ -438,6 +539,10 @@ export const receive = httpAction(async (ctx, req) => {
     date: str(body.date) || str(body.date_created) || undefined,
     ghlContactId: isGhlTest ? undefined : ghlContactId,
     test: isGhlTest || undefined,
+    campaignParam: forcedCampaign || undefined,
+    bodyCampaign: bodyCampaign || undefined,
+    hasAttribution: hasAttr,
+    userAgent: req.headers.get('user-agent')?.slice(0, 120) ?? undefined,
   })
   if (!result.ok) return json(result, 401)
   return json(result, 'skipped' in result ? 200 : 201)

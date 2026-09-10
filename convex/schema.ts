@@ -49,6 +49,26 @@ export default defineSchema({
     .index('by_slug', ['slug'])
     .index('by_webhook', ['webhookKey']),
 
+  // Journal des réceptions du webhook /api/leads (une ligne par appel, y
+  // compris clé invalide) : permet de voir depuis la fiche client / la page
+  // campagne ce que GHL a réellement envoyé et ce que Tracify en a fait.
+  webhookEvents: defineTable({
+    clientSlug: v.optional(v.string()),
+    at: v.string(),
+    outcome: v.string(),
+    detail: v.optional(v.string()),
+    name: v.optional(v.string()),
+    // Campagne présente dans l'adresse (?campaign=), dans le corps, ou
+    // retenue au final
+    campaignParam: v.optional(v.string()),
+    bodyCampaign: v.optional(v.string()),
+    campaignId: v.optional(v.string()),
+    hasAttribution: v.boolean(),
+    test: v.boolean(),
+    keyOk: v.boolean(),
+    userAgent: v.optional(v.string()),
+  }).index('by_client', ['clientSlug', 'at']),
+
   // Campagnes Meta rattachées à un client — un simple ID de campagne suffit,
   // la sync récupère le nom, le statut et les stats depuis la Graph API.
   campaigns: defineTable({
