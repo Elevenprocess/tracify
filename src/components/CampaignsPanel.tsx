@@ -116,6 +116,7 @@ export default function CampaignsPanel({
             items={inactive}
             empty="Aucune campagne inactive."
             className="mt-5"
+            collapsible
           />
         </>
       )}
@@ -130,6 +131,7 @@ function CampaignGroup({
   items,
   empty,
   className = '',
+  collapsible = false,
 }: {
   title: string
   tone: string
@@ -137,13 +139,17 @@ function CampaignGroup({
   items: Array<CampaignItem>
   empty: string
   className?: string
+  // Groupe repliable (replié par défaut) : bouton « Développer / Réduire »
+  collapsible?: boolean
 }) {
+  const [open, setOpen] = useState(!collapsible)
+  const listId = `campaign-group-${title.toLowerCase()}`
   return (
     <section
       className={className}
       aria-label={`Campagnes ${title.toLowerCase()}`}
     >
-      <p className="island-kicker m-0 mb-2 flex items-center gap-2">
+      <p className="island-kicker m-0 mb-2 flex flex-wrap items-center gap-2">
         <span
           className="h-1.5 w-1.5 rounded-full"
           style={{ background: tone }}
@@ -158,13 +164,27 @@ function CampaignGroup({
             {hint}
           </span>
         )}
+        {collapsible && items.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls={listId}
+            className="btn btn-ghost btn-sm ml-auto gap-1 px-2 py-1 text-[11px] normal-case tracking-normal"
+          >
+            <ChevronRightIcon
+              className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`}
+            />
+            {open ? 'Réduire' : 'Développer'}
+          </button>
+        )}
       </p>
-      {items.length === 0 ? (
+      {collapsible && !open ? null : items.length === 0 ? (
         <p className="m-0 rounded-xl border border-dashed border-[var(--line)] px-3.5 py-2.5 text-xs text-[var(--sea-ink-faint)]">
           {empty}
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        <ul id={listId} className="m-0 flex list-none flex-col gap-2 p-0">
           {items.map((c) => (
             <CampaignRow key={c.id} campaign={c} />
           ))}
