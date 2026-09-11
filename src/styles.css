@@ -55,6 +55,16 @@ body,
   min-height: 100%;
 }
 
+/* Jamais de défilement horizontal : la coupe est posée sur html ET body
+   (Safari iOS ignore overflow-x sur body seul) ; `clip` ne crée pas de
+   conteneur de défilement, donc l'en-tête collant continue de fonctionner. */
+html,
+body {
+  width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   color: var(--sea-ink);
@@ -73,7 +83,6 @@ body {
       transparent 60%
     );
   background-attachment: fixed;
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Footer collant : le contenu pousse, le footer reste en bas de l'écran */
@@ -119,7 +128,7 @@ code {
 }
 
 .page-wrap {
-  width: min(1080px, calc(100% - 2rem));
+  width: 100%;
   margin-inline: auto;
 }
 
@@ -383,6 +392,54 @@ code {
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Squelette des KPI : sur ordinateur, autant de colonnes que la place le permet */
+@media (min-width: 640px) {
+  .kpi-skeleton {
+    grid-template-columns: repeat(auto-fit, minmax(var(--kpi-min), 1fr));
+  }
+}
+
+/* KPI sur mobile (< 640 px) : cartes deux par rangée, dimensions et textes
+   réduits de moitié par rapport à la version ordinateur. */
+@media (max-width: 639px) {
+  .kpi-card {
+    gap: 0.375rem;
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+  }
+
+  .kpi-card .kpi-label {
+    font-size: 0.6rem;
+    line-height: 1.2;
+  }
+
+  .kpi-card .kpi-value {
+    font-size: 0.95rem;
+    line-height: 1.15;
+  }
+
+  .kpi-card .kpi-meta {
+    font-size: 0.6rem;
+    gap: 0.35rem;
+  }
+
+  .kpi-card .kpi-meta svg {
+    width: 7px;
+    height: 7px;
+  }
+
+  .kpi-card .icon-chip {
+    width: 1.05rem;
+    height: 1.05rem;
+    border-radius: 0.35rem;
+  }
+
+  .kpi-card .icon-chip svg {
+    width: 0.6rem;
+    height: 0.6rem;
+  }
 }
 
 button,

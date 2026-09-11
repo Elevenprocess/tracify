@@ -28,11 +28,11 @@ export default function KpiCard({
 
   return (
     <article
-      className={`island-shell relative flex flex-col rounded-2xl ${compact ? 'gap-2 p-4' : 'gap-3 p-5'}`}
+      className={`kpi-card island-shell relative flex flex-col rounded-2xl ${compact ? 'gap-2 p-4' : 'gap-3 p-5'}`}
     >
       <div className="flex items-start justify-between gap-3">
         <p
-          className={`m-0 font-semibold text-[var(--sea-ink-soft)] ${compact ? 'text-xs' : 'text-[0.8rem]'}`}
+          className={`kpi-label m-0 font-semibold text-[var(--sea-ink-soft)] ${compact ? 'text-xs' : 'text-[0.8rem]'}`}
         >
           {label}
         </p>
@@ -45,12 +45,12 @@ export default function KpiCard({
         )}
       </div>
       <p
-        className={`tabular m-0 font-extrabold tracking-tight text-[var(--sea-ink)] ${compact ? 'text-[1.35rem] leading-tight' : 'text-[1.9rem] leading-none'}`}
+        className={`kpi-value tabular m-0 font-extrabold tracking-tight text-[var(--sea-ink)] ${compact ? 'text-[1.35rem] leading-tight' : 'text-[1.9rem] leading-none'}`}
       >
         {value}
       </p>
       {delta !== undefined ? (
-        <p className="m-0 flex flex-wrap items-center gap-2 text-xs">
+        <p className="kpi-meta m-0 flex flex-wrap items-center gap-2 text-xs">
           <span
             className="tabular inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-bold"
             style={{
@@ -88,7 +88,9 @@ export default function KpiCard({
           )}
         </p>
       ) : hint ? (
-        <p className="m-0 text-xs text-[var(--sea-ink-faint)]">{hint}</p>
+        <p className="kpi-meta m-0 text-xs text-[var(--sea-ink-faint)]">
+          {hint}
+        </p>
       ) : null}
     </article>
   )

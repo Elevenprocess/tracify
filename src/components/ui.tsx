@@ -129,14 +129,17 @@ export function PageSkeleton({ kpis = 3 }: { kpis?: number }) {
         <Skeleton className="mb-2 h-3 w-40" />
         <Skeleton className="h-8 w-72 max-w-full" />
       </div>
+      {/* Même gabarit que les KPI : deux par rangée sur mobile, sinon auto */}
       <div
-        className="grid grid-cols-1 gap-4"
-        style={{
-          gridTemplateColumns: `repeat(auto-fit, minmax(${kpis > 3 ? '180px' : '220px'}, 1fr))`,
-        }}
+        className="kpi-skeleton grid grid-cols-2 gap-2 sm:gap-4"
+        style={
+          {
+            '--kpi-min': kpis > 3 ? '180px' : '220px',
+          } as React.CSSProperties
+        }
       >
         {Array.from({ length: kpis }, (_, i) => (
-          <div key={i} className="island-shell rounded-2xl p-5">
+          <div key={i} className="kpi-card island-shell rounded-2xl p-5">
             <Skeleton className="mb-4 h-3 w-24" />
             <Skeleton className="h-8 w-28" />
           </div>

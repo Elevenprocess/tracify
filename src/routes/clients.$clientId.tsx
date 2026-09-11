@@ -178,7 +178,7 @@ function ClientDetail() {
 
           <section
             aria-label="Indicateurs clés"
-            className="rise-in grid grid-cols-1 gap-4 sm:grid-cols-3"
+            className="rise-in grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4"
           >
             <KpiCard
               label="Dépense publicitaire"

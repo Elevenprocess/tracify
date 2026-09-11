@@ -148,7 +148,7 @@ export default function ClientOverview({
     <>
       <section
         aria-label="Indicateurs clés"
-        className="rise-in grid grid-cols-2 gap-3 sm:grid-cols-4"
+        className="rise-in grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3"
       >
         <KpiCard
           label="Dépense publicitaire"

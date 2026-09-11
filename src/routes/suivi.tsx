@@ -202,7 +202,7 @@ function SuiviView({
 
   if (data === undefined) {
     return (
-      <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
+      <main className="w-full px-4 py-8 sm:px-8">
         <PageSkeleton kpis={4} />
       </main>
     )
@@ -210,7 +210,7 @@ function SuiviView({
 
   if (data === null) {
     return (
-      <main className="mx-auto w-full max-w-5xl px-4 py-16 sm:px-8">
+      <main className="w-full px-4 py-16 sm:px-8">
         <EmptyState
           title={invalidTitle}
           hint={invalidHint}
@@ -379,7 +379,7 @@ function SuiviView({
 
       {/* Contenu */}
       <div className="min-w-0 flex-1">
-        <main className="mx-auto w-full min-w-0 max-w-5xl px-4 pb-7 pt-16 sm:px-8 lg:py-9">
+        <main className="w-full min-w-0 px-4 pb-7 pt-16 sm:px-8 lg:py-9">
           <header className="rise-in mb-6">
             <p className="island-kicker m-0 mb-1.5">
               Suivi de vos publicités · {data.client.name}

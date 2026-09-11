@@ -67,7 +67,7 @@ function Dashboard() {
 
       <section
         aria-label="Indicateurs clés"
-        className="rise-in grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="rise-in grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4"
       >
         <KpiCard
           label="Dépense publicitaire"

@@ -73,7 +73,7 @@ export default function CampaignOverview({
     <>
       <section
         aria-label="Indicateurs clés"
-        className={`rise-in grid gap-4 ${compact ? 'grid-cols-2 gap-3 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}
+        className={`rise-in grid grid-cols-2 gap-2 sm:grid-cols-3 ${compact ? 'sm:gap-3' : 'sm:gap-4'}`}
       >
         <KpiCard
           label="Dépense publicitaire"
