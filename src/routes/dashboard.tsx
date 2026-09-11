@@ -112,31 +112,32 @@ function Dashboard() {
             </span>
           </SectionTitle>
           <div className="island-shell rounded-2xl">
-            <ul className="m-0 list-none divide-y divide-[var(--line)] p-0">
+            {/* Liste bornée en hauteur (≈ 6 lignes), défilement interne */}
+            <ul className="m-0 max-h-72 list-none divide-y divide-[var(--line)] overflow-y-auto overscroll-contain p-0">
               {data.toHandle.map((p) => (
                 <li key={p.id}>
                   <Link
                     to="/clients/$clientId"
                     params={{ clientId: p.clientSlug }}
-                    className="group flex items-center gap-3 px-4 py-3 no-underline hover:bg-[var(--surface-strong)]"
+                    className="group flex items-center gap-2.5 px-3 py-1.5 no-underline hover:bg-[var(--surface-strong)]"
                   >
-                    <span className="icon-chip h-8 w-8 rounded-lg text-xs font-extrabold uppercase">
+                    <span className="icon-chip lead-avatar font-extrabold uppercase">
                       {p.name.slice(0, 2)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--sea-ink)]">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--sea-ink)]">
                         {p.viaWebhook && (
                           <WebhookIcon className="h-3 w-3 flex-shrink-0 text-[var(--lagoon)]" />
                         )}
                         <span className="truncate">{p.name}</span>
                         {p.phone && (
-                          <span className="tabular hidden items-center gap-1 text-xs font-normal text-[var(--sea-ink-soft)] sm:inline-flex">
+                          <span className="tabular hidden items-center gap-1 text-[11px] font-normal text-[var(--sea-ink-soft)] sm:inline-flex">
                             <PhoneIcon className="h-3 w-3" />
                             {p.phone}
                           </span>
                         )}
                       </span>
-                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-[var(--sea-ink-soft)]">
+                      <span className="flex items-center gap-1.5 truncate text-[11px] text-[var(--sea-ink-soft)]">
                         <span className="font-semibold text-[var(--sea-ink)]">
                           {p.clientName}
                         </span>
@@ -151,10 +152,10 @@ function Dashboard() {
                         <span>{p.source}</span>
                       </span>
                     </span>
-                    <span className="tabular whitespace-nowrap text-xs text-[var(--sea-ink-faint)]">
+                    <span className="tabular whitespace-nowrap text-[11px] text-[var(--sea-ink-faint)]">
                       {formatAgo(p.createdAt)}
                     </span>
-                    <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-[var(--sea-ink-faint)] group-hover:text-[var(--lagoon)]" />
+                    <ChevronRightIcon className="h-3.5 w-3.5 flex-shrink-0 text-[var(--sea-ink-faint)] group-hover:text-[var(--lagoon)]" />
                   </Link>
                 </li>
               ))}

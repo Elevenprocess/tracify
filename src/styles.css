@@ -394,6 +394,16 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
+/* Pastille initiales des lignes « Derniers prospects à traiter » (les
+   utilitaires h-*/
+w-* ne priment pas sur .icon-chip, défini hors couche) */
+.icon-chip.lead-avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.4rem;
+  font-size: 10px;
+}
+
 /* Squelette des KPI : sur ordinateur, autant de colonnes que la place le permet */
 @media (min-width: 640px) {
   .kpi-skeleton {
