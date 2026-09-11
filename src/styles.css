@@ -395,8 +395,8 @@ code {
 }
 
 /* Pastille initiales des lignes « Derniers prospects à traiter » (les
-   utilitaires h-*/
-w-* ne priment pas sur .icon-chip, défini hors couche) */
+   utilitaires de taille Tailwind ne priment pas sur .icon-chip, défini hors
+   couche) */
 .icon-chip.lead-avatar {
   width: 1.5rem;
   height: 1.5rem;
