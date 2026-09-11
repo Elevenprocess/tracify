@@ -1,9 +1,18 @@
 import { Link } from '@tanstack/react-router'
 
+// Identifiant de l'emplacement où la barre latérale (Sidebar) vient poser sa
+// poignée mobile, par portail — le header est rendu au-dessus des routes.
+export const SIDEBAR_TRIGGER_SLOT_ID = 'sidebar-trigger-slot'
+
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--header-bg)] px-4 backdrop-blur-lg sm:px-8">
-      <nav className="page-wrap flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:py-4">
+      <nav className="page-wrap relative flex items-center justify-center py-3 sm:py-4 lg:justify-start">
+        {/* Poignée du menu (mobile / tablette), remplie par Sidebar */}
+        <span
+          id={SIDEBAR_TRIGGER_SLOT_ID}
+          className="absolute left-0 top-1/2 flex -translate-y-1/2 items-center lg:hidden"
+        />
         <h2 className="m-0 flex-shrink-0 text-base font-semibold tracking-tight">
           <Link
             to="/"
@@ -16,17 +25,6 @@ export default function Header() {
             Tracify
           </Link>
         </h2>
-
-        <div className="ml-auto flex items-center gap-x-4 text-sm font-semibold sm:gap-x-6">
-          <Link
-            to="/dashboard"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-            activeOptions={{ exact: true }}
-          >
-            Tableau de bord
-          </Link>
-        </div>
       </nav>
     </header>
   )

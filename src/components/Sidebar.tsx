@@ -2,12 +2,14 @@
 // - ordinateur : collée au bord gauche, se replie en colonne d'icônes
 //   (état mémorisé dans localStorage) ;
 // - mobile : tiroir qui glisse depuis la gauche par-dessus le contenu,
-//   ouvert par une poignée fixée au bord de l'écran. Jamais de barre
-//   horizontale.
+//   ouvert par une poignée posée dans la barre du haut (portail vers le
+//   header). Jamais de barre horizontale.
 import { Children, createContext, useContext, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ChevronLeftIcon, ChevronRightIcon, MenuIcon, XIcon } from './icons'
+import { SIDEBAR_TRIGGER_SLOT_ID } from './Header'
 
 const STORAGE_KEY = 'tracify:sidebar'
 
@@ -47,6 +49,12 @@ export function Sidebar({
       return !c
     })
 
+  // Emplacement de la poignée dans le header (présent après l'hydratation)
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setSlot(document.getElementById(SIDEBAR_TRIGGER_SLOT_ID))
+  }, [])
+
   // Échap ferme le tiroir mobile
   useEffect(() => {
     if (!open) return
@@ -59,17 +67,20 @@ export function Sidebar({
 
   return (
     <SidebarContext.Provider value={{ collapsed }}>
-      {/* Poignée mobile, fixée au bord gauche */}
-      {!open && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Ouvrir le menu"
-          className="fixed left-0 top-[72px] z-40 flex h-10 w-9 cursor-pointer items-center justify-center rounded-r-xl border border-l-0 border-[var(--line)] bg-[var(--surface-solid)] text-[var(--sea-ink)] shadow-[0_8px_22px_rgba(0,0,0,0.25)] lg:hidden"
-        >
-          <MenuIcon className="h-4 w-4" />
-        </button>
-      )}
+      {/* Poignée mobile, dans la barre du haut */}
+      {slot &&
+        createPortal(
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
+            aria-expanded={open}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--surface-strong)] text-[var(--sea-ink)] hover:border-[var(--line-strong)]"
+          >
+            <MenuIcon className="h-4 w-4" />
+          </button>,
+          slot,
+        )}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-[rgba(0,0,0,0.55)] backdrop-blur-[2px] lg:hidden"

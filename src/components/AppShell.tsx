@@ -34,7 +34,7 @@ export default function AppShell({
     <div className="flex flex-1 flex-col lg:flex-row">
       <AdminSidebar initial={sidebarInitial} />
       <div className="min-w-0 flex-1">
-        <div className="w-full px-4 pb-7 pt-16 sm:px-8 lg:py-9">{children}</div>
+        <div className="w-full px-4 py-6 sm:px-8 lg:py-9">{children}</div>
       </div>
     </div>
   )

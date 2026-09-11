@@ -379,7 +379,7 @@ function SuiviView({
 
       {/* Contenu */}
       <div className="min-w-0 flex-1">
-        <main className="w-full min-w-0 px-4 pb-7 pt-16 sm:px-8 lg:py-9">
+        <main className="w-full min-w-0 px-4 py-6 sm:px-8 lg:py-9">
           <header className="rise-in mb-6">
             <p className="island-kicker m-0 mb-1.5">
               Suivi de vos publicités · {data.client.name}
