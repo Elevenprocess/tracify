@@ -44,6 +44,16 @@ export default defineSchema({
     ghlLocationId: v.optional(v.string()),
     ghlLastSyncAt: v.optional(v.string()),
     ghlSyncError: v.optional(v.string()),
+    // Colonnes du pipeline ajoutées à la main (placées avant « Perdu »).
+    pipelineStages: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          label: v.string(),
+          color: v.string(),
+        }),
+      ),
+    ),
     createdAt: v.string(),
   })
     .index('by_slug', ['slug'])
@@ -180,12 +190,9 @@ export default defineSchema({
     date: v.string(),
     source: v.string(),
     medium: v.string(),
-    status: v.union(
-      v.literal('new'),
-      v.literal('contacted'),
-      v.literal('qualified'),
-      v.literal('lost'),
-    ),
+    // 'new' | 'contacted' | 'qualified' | 'sold' | 'lost' ou la clé d'une
+    // colonne ajoutée à la main sur le client (clients.pipelineStages).
+    status: v.string(),
     // Arrivé automatiquement (webhook ou synchro GHL) — sinon saisie manuelle.
     viaWebhook: v.optional(v.boolean()),
     // ID du contact GoHighLevel d'origine (anti-doublon de la synchro).

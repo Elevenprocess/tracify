@@ -1,16 +1,47 @@
 import { internalMutation, mutation, query } from './_generated/server'
-import type { MutationCtx } from './_generated/server'
+import type { MutationCtx, QueryCtx } from './_generated/server'
 import { v } from 'convex/values'
 import { requireUser } from './guard'
 import type { Doc, Id } from './_generated/dataModel'
 
-export const STATUS = v.union(
-  v.literal('new'),
-  v.literal('contacted'),
-  v.literal('qualified'),
-  v.literal('lost'),
-)
-type Status = 'new' | 'contacted' | 'qualified' | 'lost'
+// Statuts de base du pipeline, dans l'ordre des colonnes. Les colonnes
+// ajoutées à la main (clients.pipelineStages) viennent s'insérer avant 'lost'.
+export const BUILTIN_STATUSES = [
+  'new',
+  'contacted',
+  'qualified',
+  'sold',
+  'lost',
+] as const
+export const STATUS = v.string()
+type Status = string
+
+export type CustomStage = { key: string; label: string; color: string }
+
+// Colonnes ajoutées à la main d'un client (vide si aucune).
+export async function stagesForClient(
+  ctx: QueryCtx | MutationCtx,
+  clientSlug: string,
+): Promise<Array<CustomStage>> {
+  const client = await ctx.db
+    .query('clients')
+    .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+    .unique()
+  return client?.pipelineStages ?? []
+}
+
+// Un statut est valide s'il est de base ou s'il correspond à une colonne du
+// client.
+export async function assertStatus(
+  ctx: QueryCtx | MutationCtx,
+  clientSlug: string,
+  status: string,
+) {
+  if ((BUILTIN_STATUSES as ReadonlyArray<string>).includes(status)) return
+  const stages = await stagesForClient(ctx, clientSlug)
+  if (!stages.some((s) => s.key === status))
+    throw new Error('Colonne inconnue pour ce client.')
+}
 
 // Carte affichée dans les kanbans (admin + espace client). `notes` n'est
 // jamais renvoyé côté client : voir access.ts qui appelle toPublicCard.
@@ -48,6 +79,7 @@ export async function applyStatus(
   const p = await ctx.db.get(id)
   if (!p) throw new Error('Prospect introuvable.')
   if (p.status === status) return
+  await assertStatus(ctx, p.clientSlug, status)
   const now = new Date().toISOString()
   const history = [
     ...(p.history ?? [{ status: p.status, at: p.createdAt }]),
@@ -183,5 +215,122 @@ export const removeInternal = internalMutation({
   args: { id: v.id('prospects') },
   handler: async (ctx, { id }) => {
     await ctx.db.delete(id)
+  },
+})
+
+// --- Colonnes du pipeline ajoutées à la main (par client) ------------------
+
+const PALETTE_FALLBACK = '#4f8ef7'
+const MAX_CUSTOM_STAGES = 8
+
+const slugify = (label: string) =>
+  label
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24) || 'colonne'
+
+async function clientBySlug(ctx: QueryCtx | MutationCtx, clientSlug: string) {
+  const client = await ctx.db
+    .query('clients')
+    .withIndex('by_slug', (q) => q.eq('slug', clientSlug))
+    .unique()
+  if (!client) throw new Error('Client introuvable.')
+  return client
+}
+
+export const stages = query({
+  args: { clientSlug: v.string() },
+  handler: async (ctx, { clientSlug }) => {
+    await requireUser(ctx)
+    return stagesForClient(ctx, clientSlug)
+  },
+})
+
+export const addStage = mutation({
+  args: {
+    clientSlug: v.string(),
+    label: v.string(),
+    color: v.optional(v.string()),
+  },
+  handler: async (ctx, { clientSlug, label, color }) => {
+    await requireUser(ctx)
+    const client = await clientBySlug(ctx, clientSlug)
+    const name = label.trim()
+    if (!name) throw new Error('Le nom de la colonne est requis.')
+    const current = client.pipelineStages ?? []
+    if (current.length >= MAX_CUSTOM_STAGES)
+      throw new Error(`${MAX_CUSTOM_STAGES} colonnes ajoutées au maximum.`)
+    if (current.some((s) => s.label.toLowerCase() === name.toLowerCase()))
+      throw new Error('Une colonne porte déjà ce nom.')
+
+    // Clé stable (x_ + libellé simplifié), unique sur le client et jamais en
+    // conflit avec les statuts de base.
+    const base = `x_${slugify(name)}`
+    let key = base
+    let i = 2
+    while (current.some((s) => s.key === key)) key = `${base}_${i++}`
+
+    const hex = /^#[0-9a-f]{6}$/i.test(color ?? '') ? color! : PALETTE_FALLBACK
+    await ctx.db.patch(client._id, {
+      pipelineStages: [...current, { key, label: name, color: hex }],
+    })
+    return { key }
+  },
+})
+
+export const renameStage = mutation({
+  args: {
+    clientSlug: v.string(),
+    key: v.string(),
+    label: v.string(),
+    color: v.optional(v.string()),
+  },
+  handler: async (ctx, { clientSlug, key, label, color }) => {
+    await requireUser(ctx)
+    const client = await clientBySlug(ctx, clientSlug)
+    const name = label.trim()
+    if (!name) throw new Error('Le nom de la colonne est requis.')
+    const current = client.pipelineStages ?? []
+    if (!current.some((s) => s.key === key))
+      throw new Error('Colonne introuvable.')
+    await ctx.db.patch(client._id, {
+      pipelineStages: current.map((s) =>
+        s.key === key
+          ? {
+              ...s,
+              label: name,
+              color: /^#[0-9a-f]{6}$/i.test(color ?? '') ? color! : s.color,
+            }
+          : s,
+      ),
+    })
+  },
+})
+
+// Suppression refusée tant que des prospects sont dans la colonne : on les
+// déplace d'abord (glisser-déposer), rien n'est perdu.
+export const removeStage = mutation({
+  args: { clientSlug: v.string(), key: v.string() },
+  handler: async (ctx, { clientSlug, key }) => {
+    await requireUser(ctx)
+    const client = await clientBySlug(ctx, clientSlug)
+    const current = client.pipelineStages ?? []
+    if (!current.some((s) => s.key === key))
+      throw new Error('Colonne introuvable.')
+    const rows = await ctx.db
+      .query('prospects')
+      .withIndex('by_client', (q) => q.eq('clientSlug', clientSlug))
+      .collect()
+    const inside = rows.filter((r) => r.status === key).length
+    if (inside > 0)
+      throw new Error(
+        `${inside} prospect${inside > 1 ? 's' : ''} dans cette colonne : déplace-les avant de la supprimer.`,
+      )
+    await ctx.db.patch(client._id, {
+      pipelineStages: current.filter((s) => s.key !== key),
+    })
   },
 })

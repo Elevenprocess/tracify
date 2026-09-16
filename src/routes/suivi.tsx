@@ -22,6 +22,7 @@ import ClientOverview from '../components/ClientOverview'
 import { DocumentList } from '../components/ClientDocuments'
 import type { DocumentItem } from '../components/ClientDocuments'
 import { isRecent } from '../lib/format'
+import { buildColumns } from '../lib/pipeline'
 import { ACCESS_CODE_KEY } from '../lib/accessCode'
 
 // Au-delà de ce nombre de campagnes, le filtre des prospects est une liste
@@ -232,6 +233,8 @@ function SuiviView({
   const campaignNames = Object.fromEntries(
     data.campaigns.map((c) => [c.metaId, c.name]),
   )
+  // Colonnes du pipeline : de base + celles ajoutées à la main par l'équipe
+  const columns = buildColumns(data.client.stages)
   // Côté client, seules les campagnes ACTIVES sont visibles (demande Mario
   // 10/09) ; les prospects rattachés à une campagne inactive restent dans le
   // kanban, avec le nom de leur campagne (campaignNames couvre tout).
@@ -411,6 +414,7 @@ function SuiviView({
             <ClientOverview
               campaigns={visibleCampaigns}
               prospects={prospects}
+              columns={columns}
               onSelectCampaign={(metaId, tab) =>
                 go(
                   tab === 'prospects'
@@ -552,6 +556,7 @@ function SuiviView({
                     : 'Tous vos prospects'
                 }
                 prospects={shownProspects}
+                columns={columns}
                 onSetStatus={onSetStatus}
                 onSaveClientNotes={onSaveClientNotes}
                 campaignNames={campaignNames}

@@ -173,10 +173,29 @@ function Dashboard() {
                   />
                   {c.label}{' '}
                   <strong className="tabular text-[var(--sea-ink)]">
-                    {formatNumber(data.pipeline[c.status])}
+                    {formatNumber(data.pipeline[c.status] ?? 0)}
                   </strong>
                 </span>
               ))}
+              {/* Prospects dans des colonnes ajoutées à la main par client */}
+              {(() => {
+                const base = new Set(COLUMNS.map((c) => c.status))
+                const others = Object.entries(data.pipeline)
+                  .filter(([k]) => !base.has(k))
+                  .reduce((s, [, n]) => s + n, 0)
+                return others > 0 ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className="h-1.5 w-1.5 rounded-full bg-[var(--sea-ink-faint)]"
+                      aria-hidden="true"
+                    />
+                    Autres colonnes{' '}
+                    <strong className="tabular text-[var(--sea-ink)]">
+                      {formatNumber(others)}
+                    </strong>
+                  </span>
+                ) : null
+              })()}
             </div>
           </div>
         </section>

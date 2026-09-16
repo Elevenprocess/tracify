@@ -7,11 +7,19 @@ import type { Id } from '../../convex/_generated/dataModel'
 import type { ProspectStatus } from '../lib/format'
 import { formatAgo, formatDateTime, formatDay, isRecent } from '../lib/format'
 import {
+  BASE_STAGES,
+  STAGE_PALETTE,
+  buildColumns,
+  columnOf,
+} from '../lib/pipeline'
+import type { Stage } from '../lib/pipeline'
+import {
   ClockIcon,
   ExternalLinkIcon,
   MailIcon,
   MegaphoneIcon,
   NoteIcon,
+  PencilIcon,
   PhoneIcon,
   PlusIcon,
   SparkleIcon,
@@ -39,40 +47,16 @@ export interface Prospect {
   clientNotes?: string
 }
 
-export const COLUMNS: Array<{
-  status: ProspectStatus
-  label: string
-  color: string
-  tint: string
-}> = [
-  {
-    status: 'new',
-    label: 'Nouveau',
-    color: 'var(--lagoon)',
-    tint: 'rgba(96,215,207,0.12)',
-  },
-  {
-    status: 'contacted',
-    label: 'Contacté',
-    color: 'var(--status-warn)',
-    tint: 'rgba(217,160,74,0.12)',
-  },
-  {
-    status: 'qualified',
-    label: 'Qualifié',
-    color: 'var(--status-good)',
-    tint: 'rgba(88,193,132,0.12)',
-  },
-  {
-    status: 'lost',
-    label: 'Perdu',
-    color: 'var(--status-muted)',
-    tint: 'rgba(138,165,161,0.12)',
-  },
-]
+// Colonnes de base (sans les colonnes ajoutées à la main d'un client) :
+// utilisées là où l'on n'a pas de client précis (tableau de bord global).
+export const COLUMNS: Array<Stage> = BASE_STAGES
 
-const columnOf = (status: string) =>
-  COLUMNS.find((c) => c.status === status) ?? COLUMNS[0]
+// Message d'une erreur Convex, sans le préfixe technique.
+const errorMessage = (e: unknown) =>
+  (e instanceof Error ? e.message : String(e))
+    .replace(/^.*Uncaught Error:\s*/s, '')
+    .replace(/\s+at .*$/s, '')
+    .trim()
 
 const initials = (name: string) =>
   name
@@ -85,26 +69,62 @@ const initials = (name: string) =>
 const isNew = (p: Prospect) =>
   p.status === 'new' && !!p.createdAt && isRecent(p.createdAt)
 
-// Kanban admin d'une campagne : lecture, statut, suppression, ajout manuel.
+// Kanban admin d'une campagne : lecture, statut, suppression, ajout manuel,
+// et gestion des colonnes du client (ajout / renommage / suppression).
 export default function ProspectsBoard({
   campaignId,
+  clientSlug,
   initial,
 }: {
   campaignId: string
+  // Client de la campagne : porte les colonnes ajoutées à la main
+  clientSlug?: string
   initial?: Array<Prospect>
 }) {
   const live = useQuery(api.prospects.byCampaign, { campaignId })
+  const stages = useQuery(
+    api.prospects.stages,
+    clientSlug ? { clientSlug } : 'skip',
+  )
   const setStatus = useMutation(api.prospects.setStatus)
   const setNotes = useMutation(api.prospects.setNotes)
   const setClientNotes = useMutation(api.prospects.setClientNotes)
   const removeProspect = useMutation(api.prospects.remove)
+  const addStage = useMutation(api.prospects.addStage)
+  const renameStage = useMutation(api.prospects.renameStage)
+  const removeStage = useMutation(api.prospects.removeStage)
+  const guarded = async (run: () => Promise<unknown>) => {
+    try {
+      await run()
+    } catch (e) {
+      window.alert(errorMessage(e))
+    }
+  }
   return (
     <PipelineBoard
       prospects={live ?? initial ?? []}
-      onSetStatus={(id, status) => setStatus({ id, status })}
+      columns={buildColumns(stages)}
+      onSetStatus={(id, status) => guarded(() => setStatus({ id, status }))}
       onSaveNotes={(id, notes) => setNotes({ id, notes })}
       onSaveClientNotes={(id, notes) => setClientNotes({ id, notes })}
       onRemove={(id) => removeProspect({ id })}
+      onAddColumn={
+        clientSlug
+          ? (label, color) =>
+              guarded(() => addStage({ clientSlug, label, color }))
+          : undefined
+      }
+      onRenameColumn={
+        clientSlug
+          ? (key, label) =>
+              guarded(() => renameStage({ clientSlug, key, label }))
+          : undefined
+      }
+      onRemoveColumn={
+        clientSlug
+          ? (key) => guarded(() => removeStage({ clientSlug, key }))
+          : undefined
+      }
       action={<AddProspectForm campaignId={campaignId} />}
     />
   )
@@ -114,10 +134,14 @@ export default function ProspectsBoard({
 // ce qui permet de le réutiliser dans l'espace client (accès par code).
 export function PipelineBoard({
   prospects,
+  columns = BASE_STAGES,
   onSetStatus,
   onSaveNotes,
   onSaveClientNotes,
   onRemove,
+  onAddColumn,
+  onRenameColumn,
+  onRemoveColumn,
   action,
   title = 'CRM prospects',
   emptyHint = 'Glisse un prospect ici',
@@ -125,7 +149,13 @@ export function PipelineBoard({
   linkCampaigns = false,
 }: {
   prospects: Array<Prospect>
+  // Colonnes affichées (de base + celles du client) — voir lib/pipeline.ts
+  columns?: Array<Stage>
   onSetStatus: (id: Id<'prospects'>, status: ProspectStatus) => void
+  // Gestion des colonnes (admin) : absent = colonnes figées
+  onAddColumn?: (label: string, color: string) => void
+  onRenameColumn?: (key: string, label: string) => void
+  onRemoveColumn?: (key: string) => void
   // Absent = notes internes masquées (espace client)
   onSaveNotes?: (id: Id<'prospects'>, notes: string) => void
   // Notes du client (espace client + aperçu admin)
@@ -141,6 +171,11 @@ export function PipelineBoard({
   const [dragOver, setDragOver] = useState<ProspectStatus | null>(null)
   const [onlyNew, setOnlyNew] = useState(false)
   const [openId, setOpenId] = useState<Id<'prospects'> | null>(null)
+  // Grille pleine largeur à partir de xl jusqu'à 5 colonnes (au-delà, la
+  // rangée défile) ; la tuile « ajouter » prend juste sa largeur.
+  const gridTemplateColumns = `repeat(${columns.length}, minmax(0, 1fr))${
+    onAddColumn ? ' auto' : ''
+  }`
 
   const newCount = prospects.filter(isNew).length
   const shown = onlyNew ? prospects.filter(isNew) : prospects
@@ -180,12 +215,18 @@ export function PipelineBoard({
         </span>
       </SectionTitle>
 
-      {/* Pipeline : les 4 colonnes côte à côte, défilement horizontal
+      {/* Pipeline : les colonnes côte à côte, défilement horizontal
           (gauche → droite) tant que l'écran est trop étroit ; grille pleine
-          largeur à partir de xl. */}
-      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:-mx-0 sm:px-0 xl:grid xl:grid-cols-4 xl:overflow-visible xl:pb-0">
-        {COLUMNS.map((col) => {
+          largeur à partir de xl tant qu'il n'y a pas trop de colonnes. */}
+      <div
+        className={`-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-2 sm:-mx-0 sm:px-0 ${
+          columns.length <= 5 ? 'xl:grid xl:overflow-visible xl:pb-0' : ''
+        }`}
+        style={{ gridTemplateColumns }}
+      >
+        {columns.map((col) => {
           const cards = shown.filter((p) => p.status === col.status)
+          const editable = col.custom && (onRenameColumn || onRemoveColumn)
           return (
             <div
               key={col.status}
@@ -195,7 +236,7 @@ export function PipelineBoard({
               }}
               onDragLeave={() => setDragOver(null)}
               onDrop={(e) => onDrop(e, col.status)}
-              className={`flex min-h-44 w-[17rem] flex-shrink-0 snap-start flex-col rounded-2xl border p-2.5 transition-colors xl:w-auto ${
+              className={`group/col flex min-h-44 w-[17rem] flex-shrink-0 snap-start flex-col rounded-2xl border p-2.5 transition-colors xl:w-auto ${
                 dragOver === col.status
                   ? 'border-[var(--lagoon)] bg-[var(--lagoon-tint)]'
                   : 'border-[var(--line)] bg-[var(--surface)]'
@@ -203,11 +244,63 @@ export function PipelineBoard({
             >
               <p className="m-0 mb-2.5 flex items-center gap-2 px-1 text-xs font-bold text-[var(--sea-ink)]">
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-2 w-2 flex-shrink-0 rounded-full"
                   style={{ background: col.color }}
                   aria-hidden="true"
                 />
-                {col.label}
+                <span className="truncate" title={col.label}>
+                  {col.label}
+                </span>
+                {editable && (
+                  <span className="flex flex-shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/col:opacity-100">
+                    {onRenameColumn && (
+                      <button
+                        type="button"
+                        aria-label={`Renommer la colonne ${col.label}`}
+                        title="Renommer"
+                        onClick={() => {
+                          const next = window.prompt(
+                            'Nouveau nom de la colonne',
+                            col.label,
+                          )
+                          if (next && next.trim() && next.trim() !== col.label)
+                            onRenameColumn(col.status, next.trim())
+                        }}
+                        className="cursor-pointer rounded-md border-0 bg-transparent p-0.5 text-[var(--sea-ink-faint)] hover:text-[var(--sea-ink)]"
+                      >
+                        <PencilIcon className="h-3 w-3" />
+                      </button>
+                    )}
+                    {onRemoveColumn && (
+                      <button
+                        type="button"
+                        aria-label={`Supprimer la colonne ${col.label}`}
+                        title={
+                          cards.length > 0
+                            ? 'Déplace d’abord les prospects de cette colonne'
+                            : 'Supprimer la colonne'
+                        }
+                        onClick={() => {
+                          if (cards.length > 0) {
+                            window.alert(
+                              `${cards.length} prospect${cards.length > 1 ? 's' : ''} dans « ${col.label} » : déplace-les avant de supprimer la colonne.`,
+                            )
+                            return
+                          }
+                          if (
+                            window.confirm(
+                              `Supprimer la colonne « ${col.label} » ?`,
+                            )
+                          )
+                            onRemoveColumn(col.status)
+                        }}
+                        className="cursor-pointer rounded-md border-0 bg-transparent p-0.5 text-[var(--sea-ink-faint)] hover:text-[var(--status-bad)]"
+                      >
+                        <TrashIcon className="h-3 w-3" />
+                      </button>
+                    )}
+                  </span>
+                )}
                 <span
                   className="tabular ml-auto rounded-md px-1.5 py-0.5 text-[11px] font-bold"
                   style={{ background: col.tint, color: col.color }}
@@ -228,6 +321,7 @@ export function PipelineBoard({
                     campaignName={
                       p.campaignId ? campaignNames[p.campaignId] : undefined
                     }
+                    columns={columns}
                     onOpen={() => setOpenId(p.id)}
                     onSetStatus={onSetStatus}
                     onRemove={onRemove}
@@ -242,11 +336,13 @@ export function PipelineBoard({
             </div>
           )
         })}
+        {onAddColumn && <AddColumnSlot onAdd={onAddColumn} />}
       </div>
 
       {open && (
         <ProspectDialog
           prospect={open}
+          columns={columns}
           campaignName={
             open.campaignId ? campaignNames[open.campaignId] : undefined
           }
@@ -273,6 +369,7 @@ function ProspectCard({
   prospect: p,
   color,
   tint,
+  columns,
   campaignName,
   onOpen,
   onSetStatus,
@@ -281,6 +378,7 @@ function ProspectCard({
   prospect: Prospect
   color: string
   tint: string
+  columns: Array<Stage>
   campaignName?: string
   onOpen: () => void
   onSetStatus: (id: Id<'prospects'>, status: ProspectStatus) => void
@@ -376,11 +474,11 @@ function ProspectCard({
       )}
       <select
         value={p.status}
-        onChange={(e) => onSetStatus(p.id, e.target.value as ProspectStatus)}
+        onChange={(e) => onSetStatus(p.id, e.target.value)}
         aria-label={`Statut de ${p.name}`}
         className="field mt-2 cursor-pointer py-1 text-xs sm:hidden"
       >
-        {COLUMNS.map((c) => (
+        {columns.map((c) => (
           <option
             key={c.status}
             value={c.status}
@@ -407,6 +505,7 @@ const BY_LABELS: Record<string, string> = {
 // notes du client sont partagées entre l'espace client et l'admin.
 export function ProspectDialog({
   prospect: p,
+  columns = BASE_STAGES,
   campaignName,
   linkCampaign,
   onClose,
@@ -416,6 +515,7 @@ export function ProspectDialog({
   onRemove,
 }: {
   prospect: Prospect
+  columns?: Array<Stage>
   campaignName?: string
   linkCampaign?: boolean
   onClose: () => void
@@ -424,7 +524,7 @@ export function ProspectDialog({
   onSaveClientNotes?: (id: Id<'prospects'>, notes: string) => void
   onRemove?: (id: Id<'prospects'>) => void
 }) {
-  const col = columnOf(p.status)
+  const col = columnOf(columns, p.status)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -530,7 +630,7 @@ export function ProspectDialog({
             <section>
               <p className="island-kicker m-0 mb-2">Statut</p>
               <div className="flex flex-wrap gap-1.5">
-                {COLUMNS.map((c) => {
+                {columns.map((c) => {
                   const active = c.status === p.status
                   return (
                     <button
@@ -718,7 +818,7 @@ export function ProspectDialog({
               </p>
               <ol className="m-0 flex list-none flex-col gap-0 p-0">
                 {history.map((h, i) => {
-                  const c = columnOf(h.status)
+                  const c = columnOf(columns, h.status)
                   return (
                     <li
                       key={`${h.at}-${i}`}
@@ -819,6 +919,115 @@ function NotesEditor({
         )}
       </div>
     </section>
+  )
+}
+
+// Dernière case de la rangée : un bouton en pointillés qui s'ouvre en petit
+// formulaire (nom + couleur). La colonne créée se place avant « Perdu ».
+function AddColumnSlot({
+  onAdd,
+}: {
+  onAdd: (label: string, color: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [label, setLabel] = useState('')
+  const [color, setColor] = useState(STAGE_PALETTE[0].hex)
+
+  const close = () => {
+    setOpen(false)
+    setLabel('')
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    const name = label.trim()
+    if (!name) return
+    onAdd(name, color)
+    close()
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Ajouter une colonne"
+        aria-label="Ajouter une colonne"
+        className="flex min-h-44 w-12 flex-shrink-0 snap-start cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--line)] bg-transparent p-2 text-[var(--sea-ink-faint)] transition-colors hover:border-[var(--lagoon)] hover:text-[var(--lagoon)]"
+      >
+        <PlusIcon className="h-4 w-4" />
+        <span
+          className="text-[11px] font-bold [writing-mode:vertical-rl]"
+          aria-hidden="true"
+        >
+          Ajouter une colonne
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="flex min-h-44 w-[17rem] flex-shrink-0 snap-start flex-col gap-2.5 rounded-2xl border border-[var(--lagoon)] bg-[var(--surface)] p-2.5"
+    >
+      <p className="m-0 flex items-center gap-2 px-1 text-xs font-bold text-[var(--sea-ink)]">
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ background: color }}
+          aria-hidden="true"
+        />
+        Nouvelle colonne
+      </p>
+      <input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        required
+        autoFocus
+        maxLength={30}
+        placeholder="Nom (ex. RDV pris)"
+        aria-label="Nom de la colonne"
+        className="field w-full py-1.5 text-sm"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') close()
+        }}
+      />
+      <div
+        className="flex flex-wrap items-center gap-1.5 px-1"
+        role="radiogroup"
+        aria-label="Couleur de la colonne"
+      >
+        {STAGE_PALETTE.map((c) => {
+          const active = c.hex === color
+          return (
+            <button
+              key={c.hex}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              aria-label={c.name}
+              title={c.name}
+              onClick={() => setColor(c.hex)}
+              className="h-5 w-5 cursor-pointer rounded-full border-2 p-0 transition-transform hover:scale-110"
+              style={{
+                background: c.hex,
+                borderColor: active ? 'var(--sea-ink)' : 'transparent',
+              }}
+            />
+          )
+        })}
+      </div>
+      <p className="m-0 px-1 text-[11px] text-[var(--sea-ink-soft)]">
+        Placée entre « Vente » et « Perdu », visible aussi par le client.
+      </p>
+      <div className="mt-auto flex items-center gap-2">
+        <button type="submit" className="btn btn-primary btn-sm">
+          Créer
+        </button>
+        <button type="button" onClick={close} className="btn btn-ghost btn-sm">
+          Annuler
+        </button>
+      </div>
+    </form>
   )
 }
 

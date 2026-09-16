@@ -1,8 +1,9 @@
 import type React from 'react'
 import KpiCard from './KpiCard'
 import LineChart from './charts/LineChart'
-import { COLUMNS } from './ProspectsBoard'
 import type { Prospect } from './ProspectsBoard'
+import { BASE_STAGES } from '../lib/pipeline'
+import type { Stage } from '../lib/pipeline'
 import type { CampaignDetailData } from './CampaignOverview'
 import { isActiveStatus, statusLabel } from './CampaignOverview'
 import {
@@ -22,10 +23,13 @@ import { formatDay, formatEuro, formatNumber, isRecent } from '../lib/format'
 export default function ClientOverview({
   campaigns,
   prospects,
+  columns = BASE_STAGES,
   onSelectCampaign,
 }: {
   campaigns: Array<CampaignDetailData>
   prospects: Array<Prospect>
+  // Colonnes du pipeline du client (de base + ajoutées à la main)
+  columns?: Array<Stage>
   onSelectCampaign: (metaId: string, tab?: 'performance' | 'prospects') => void
 }) {
   const spend = campaigns.reduce((s, c) => s + c.totals.spend, 0)
@@ -50,8 +54,9 @@ export default function ClientOverview({
     value: d.leads,
   }))
 
-  const pipeline = { new: 0, contacted: 0, qualified: 0, lost: 0 }
-  for (const p of prospects) pipeline[p.status] += 1
+  const pipeline: Partial<Record<string, number>> = {}
+  for (const p of prospects) pipeline[p.status] = (pipeline[p.status] ?? 0) + 1
+  const toHandle = pipeline.new ?? 0
   const fresh = prospects.filter(
     (p) => p.status === 'new' && p.createdAt && isRecent(p.createdAt),
   ).length
@@ -172,7 +177,7 @@ export default function ClientOverview({
         />
         <KpiCard
           label="À traiter"
-          value={formatNumber(pipeline.new)}
+          value={formatNumber(toHandle)}
           icon={<InboxIcon />}
           compact
           hint={
@@ -215,8 +220,8 @@ export default function ClientOverview({
             aria-label="Répartition des prospects par statut"
           >
             {prospects.length > 0 &&
-              COLUMNS.map((c) => {
-                const n = pipeline[c.status]
+              columns.map((c) => {
+                const n = pipeline[c.status] ?? 0
                 if (!n) return null
                 return (
                   <span
@@ -230,8 +235,8 @@ export default function ClientOverview({
                 )
               })}
           </div>
-          <ul className="m-0 mt-4 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-4">
-            {COLUMNS.map((c) => (
+          <ul className="m-0 mt-4 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-5">
+            {columns.map((c) => (
               <li
                 key={c.status}
                 className="rounded-xl border border-[var(--line)] px-3 py-2.5"
@@ -245,7 +250,7 @@ export default function ClientOverview({
                   {c.label}
                 </p>
                 <p className="tabular m-0 mt-1 text-xl font-extrabold text-[var(--sea-ink)]">
-                  {formatNumber(pipeline[c.status])}
+                  {formatNumber(pipeline[c.status] ?? 0)}
                 </p>
               </li>
             ))}

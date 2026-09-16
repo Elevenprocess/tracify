@@ -134,7 +134,12 @@ async function buildTrackingView(ctx: QueryCtx, clientSlug: string) {
   details.sort((a, b) => b.totals.spend - a.totals.spend)
 
   return {
-    client: { slug: client.slug, name: client.name },
+    client: {
+      slug: client.slug,
+      name: client.name,
+      // Colonnes du pipeline ajoutées à la main (affichées côté client)
+      stages: client.pipelineStages ?? [],
+    },
     campaigns: details,
   }
 }

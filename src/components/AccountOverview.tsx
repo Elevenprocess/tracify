@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { COLUMNS } from './ProspectsBoard'
+import { buildColumns } from '../lib/pipeline'
+import type { CustomStage } from '../lib/pipeline'
 import {
   CheckIcon,
   ClockIcon,
@@ -15,7 +16,10 @@ import { SectionTitle } from './ui'
 import { formatAgo, formatNumber, formatPercent } from '../lib/format'
 
 export interface AccountData {
-  pipeline: { new: number; contacted: number; qualified: number; lost: number }
+  // Compteurs par statut (statuts de base + colonnes ajoutées à la main)
+  pipeline: Record<string, number>
+  // Colonnes ajoutées à la main sur ce client
+  stages?: Array<CustomStage>
   totalLeads: number
   newLeads24h: number
   qualificationRate: number | null
@@ -50,7 +54,9 @@ export default function AccountOverview({
 }) {
   const { pipeline } = account
   const total = account.totalLeads
-  const treated = pipeline.contacted + pipeline.qualified + pipeline.lost
+  const columns = buildColumns(account.stages)
+  // Traités = tout ce qui n'est plus « Nouveau »
+  const treated = total - pipeline.new
 
   return (
     <section className="mb-6">
@@ -88,8 +94,8 @@ export default function AccountOverview({
             aria-label="Répartition des prospects par statut"
           >
             {total > 0 &&
-              COLUMNS.map((c) => {
-                const n = pipeline[c.status]
+              columns.map((c) => {
+                const n = pipeline[c.status] ?? 0
                 if (!n) return null
                 return (
                   <span
@@ -104,8 +110,8 @@ export default function AccountOverview({
               })}
           </div>
 
-          <ul className="m-0 mt-4 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-4">
-            {COLUMNS.map((c) => (
+          <ul className="m-0 mt-4 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-5">
+            {columns.map((c) => (
               <li
                 key={c.status}
                 className="rounded-xl border border-[var(--line)] px-3 py-2.5"
@@ -119,7 +125,7 @@ export default function AccountOverview({
                   {c.label}
                 </p>
                 <p className="tabular m-0 mt-1 text-xl font-extrabold text-[var(--sea-ink)]">
-                  {formatNumber(pipeline[c.status])}
+                  {formatNumber(pipeline[c.status] ?? 0)}
                 </p>
               </li>
             ))}

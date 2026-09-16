@@ -315,7 +315,7 @@ export const run = internalMutation({
           date,
           source,
           medium,
-          status: status as 'new' | 'contacted' | 'qualified' | 'lost',
+          status,
           createdAt: now,
         })
       }

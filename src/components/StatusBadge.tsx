@@ -1,4 +1,6 @@
 import type { CampaignStatus, ProspectStatus } from '../lib/format'
+import { BASE_STAGES, columnOf } from '../lib/pipeline'
+import type { Stage } from '../lib/pipeline'
 
 const CAMPAIGN_LABELS: Record<
   CampaignStatus,
@@ -9,23 +11,28 @@ const CAMPAIGN_LABELS: Record<
   ended: { label: 'Terminée', color: 'var(--status-muted)' },
 }
 
-const PROSPECT_LABELS: Record<
-  ProspectStatus,
-  { label: string; color: string }
-> = {
-  new: { label: 'Nouveau', color: 'var(--chart-1)' },
-  contacted: { label: 'Contacté', color: 'var(--status-warn)' },
-  qualified: { label: 'Qualifié', color: 'var(--status-good)' },
-  lost: { label: 'Perdu', color: 'var(--status-muted)' },
-}
+// Colonnes de base ; une colonne ajoutée à la main est affichée avec son
+// libellé si on le connaît (prop `columns`), sinon en neutre.
+const PROSPECT_LABELS: Record<string, { label: string; color: string }> =
+  Object.fromEntries(
+    BASE_STAGES.map((s) => [s.status, { label: s.label, color: s.color }]),
+  )
 
 export function CampaignBadge({ status }: { status: CampaignStatus }) {
   const { label, color } = CAMPAIGN_LABELS[status]
   return <Badge label={label} color={color} />
 }
 
-export function ProspectBadge({ status }: { status: ProspectStatus }) {
-  const { label, color } = PROSPECT_LABELS[status]
+export function ProspectBadge({
+  status,
+  columns,
+}: {
+  status: ProspectStatus
+  columns?: Array<Stage>
+}) {
+  const { label, color } = columns
+    ? columnOf(columns, status)
+    : (PROSPECT_LABELS[status] ?? columnOf(BASE_STAGES, status))
   return <Badge label={label} color={color} />
 }
 

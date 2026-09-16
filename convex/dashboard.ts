@@ -3,21 +3,25 @@ import { v } from 'convex/values'
 import { requireUser } from './guard'
 import type { Doc } from './_generated/dataModel'
 
+// Compteurs par statut : les cinq statuts de base toujours présents, les
+// colonnes ajoutées à la main (clé x_…) en plus quand elles ont des prospects.
 type Pipeline = {
   new: number
   contacted: number
   qualified: number
+  sold: number
   lost: number
-}
+} & Record<string, number>
 const emptyPipeline = (): Pipeline => ({
   new: 0,
   contacted: 0,
   qualified: 0,
+  sold: 0,
   lost: 0,
 })
 function countPipeline(rows: Array<Doc<'prospects'>>): Pipeline {
   const p = emptyPipeline()
-  for (const r of rows) p[r.status] += 1
+  for (const r of rows) p[r.status] = (p[r.status] ?? 0) + 1
   return p
 }
 function countBy(values: Array<string>) {
@@ -43,7 +47,7 @@ export const overview = query({
     const pipelineByClient = new Map<string, Pipeline>()
     for (const p of prospects) {
       const agg = pipelineByClient.get(p.clientSlug) ?? emptyPipeline()
-      agg[p.status] += 1
+      agg[p.status] = (agg[p.status] ?? 0) + 1
       pipelineByClient.set(p.clientSlug, agg)
     }
     const since24h = cutoffIso(24 * 3_600_000)
@@ -194,7 +198,9 @@ export const client = query({
 
     const pipeline = countPipeline(prospects)
     const totalLeads = prospects.length
-    const closed = pipeline.qualified + pipeline.lost
+    // Qualifiés = qualifiés + ventes ; traités jusqu'au bout = + perdus
+    const won = pipeline.qualified + pipeline.sold
+    const closed = won + pipeline.lost
     const lastLead = prospects.reduce<string | null>(
       (m, p) => (m === null || p.createdAt > m ? p.createdAt : m),
       null,
@@ -258,13 +264,14 @@ export const client = query({
       // Tableau de bord du compte : pipeline, accès, réception des leads
       account: {
         pipeline,
+        // Colonnes ajoutées à la main sur ce client
+        stages: client.pipelineStages ?? [],
         totalLeads,
         newLeads24h: prospects.filter(
           (p) => p.createdAt > cutoffIso(24 * 3_600_000),
         ).length,
         // Taux de qualification parmi les prospects traités jusqu'au bout
-        qualificationRate:
-          closed > 0 ? (pipeline.qualified / closed) * 100 : null,
+        qualificationRate: closed > 0 ? (won / closed) * 100 : null,
         viaWebhook: prospects.filter((p) => p.viaWebhook).length,
         lastLeadAt: lastLead,
         lastSyncAt: lastSync,

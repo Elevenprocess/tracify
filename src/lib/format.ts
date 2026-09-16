@@ -1,5 +1,7 @@
 export type CampaignStatus = 'active' | 'paused' | 'ended'
-export type ProspectStatus = 'new' | 'contacted' | 'qualified' | 'lost'
+// Statut d'un prospect : 'new' | 'contacted' | 'qualified' | 'sold' | 'lost'
+// ou la clé d'une colonne ajoutée à la main (voir lib/pipeline.ts).
+export type ProspectStatus = string
 
 export const formatEuro = (n: number) =>
   new Intl.NumberFormat('fr-FR', {

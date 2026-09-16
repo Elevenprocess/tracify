@@ -95,7 +95,7 @@ function CampaignDetail() {
 
       <CampaignOverview data={data} />
 
-      <ProspectsBoard campaignId={data.metaId} />
+      <ProspectsBoard campaignId={data.metaId} clientSlug={data.client?.slug} />
 
       {data.client && (
         <section className="mt-8">
